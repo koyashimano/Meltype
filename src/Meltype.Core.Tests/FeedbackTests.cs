@@ -834,6 +834,32 @@ internal static class LanguageLearningTests
     }
 
     [Test]
+    public static void F10_ThenMoreLetters_DoesNotLearnFragment()
+    {
+        // get と打つ途中の げ を F10 で英字にして続けて打つと、確定した ge だけを英語として覚え、
+        // genninntosite (原因として) まで英字になっていた。
+        var memory = new LanguageMemory(null);
+        CompositionTests.Detector.Memory = memory;
+        try
+        {
+            var k = new CompositionTests.Keyboard(languages: memory);
+            k.Type("ge");
+            k.Press(VirtualKeys.F10);
+            k.Type("t\n");
+            Assert.Equal("get", k.Host.Document);
+            Assert.Equal(null, memory.Get("ge"), "語の途中の ge は覚えない");
+
+            var next = new CompositionTests.Keyboard(languages: memory);
+            next.Type("genninntosite\n");
+            Assert.Equal("げんいんとして", next.Host.Document);
+        }
+        finally
+        {
+            CompositionTests.Detector.Memory = null;
+        }
+    }
+
+    [Test]
     public static void ShortLearnedWord_DoesNotSplitJapanese()
     {
         // 一度 go を英字で確定したら、日本語 (nihongo) が にほんgo になっていた。

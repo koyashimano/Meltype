@@ -944,7 +944,7 @@ public sealed class CompositionController
                 ReplayDown(e);
                 return;
             }
-            CommitBeforeTyping();
+            CommitBeforeTyping(ch);
             _text.Append(ch);
             return;
         }
@@ -1052,12 +1052,14 @@ public sealed class CompositionController
     /// 入力中に次の文字を打ったとき。変換中なら、今の候補で確定して新しい入力を始める (IME と同じ。設定で、確定せずに続けることもできる)。
     /// F6〜F10 でかな・英字にしたあとなら、見えているとおりに確定して新しい入力を始める (続けて打った文字までカタカナ・大文字にしない)。
     /// </summary>
-    private void CommitBeforeTyping()
+    private void CommitBeforeTyping(char? next = null)
     {
         if (_converting) CommitOrKeepConversion();
         else if (_modeByKey)
         {
+            _wordContinues = next is { } letter && char.IsAsciiLetter(letter);
             Commit();
+            _wordContinues = false;
             BeginComposition();
         }
         else if (SelectedPrediction() is { } prediction)
@@ -1070,6 +1072,9 @@ public sealed class CompositionController
 
     // F6〜F10 (Ctrl+U/I/O/P・無変換・ひらがなキーも) でかな・英字にしたか。次に文字を打ったら確定する。
     private bool _modeByKey;
+
+    // F6〜F10 のあとに打った英字で確定しているところか (確定した英字は語の途中なので、英語の語として覚えない)。
+    private bool _wordContinues;
 
     // 続けて打つ前に選んでいた候補 (読み → 文字)。確定するか、変換ボックスを空にするまで。
     private readonly Dictionary<string, string> _keptChoices = [];
@@ -3004,7 +3009,9 @@ public sealed class CompositionController
         var automatic = _text.Segments();
         switch (_text.Mode)
         {
-            case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish):
+            // 英字にしたあと続けて英字を打った (ge → F10 → t) なら、確定した英字は語の途中なので覚えない
+            // (覚えると、ge で始まる日本語 (げんいん・げんじつ) までずっと英字になっていた)。
+            case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish) && !_wordContinues:
                 memory.Remember(raw, english: true, explicitChoice: true);
                 break;
             case DisplayMode.Hiragana or DisplayMode.Katakana or DisplayMode.HalfWidthKatakana when automatic.Any(s => s.IsEnglish):
