@@ -56,6 +56,7 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
         event.merge(fields) { _, new in new }
         guard let output = NativeCore.shared.send(Self.host, event) else { return nil }
         japanese = output.state.languageMode == .japanese
+        ModeStatusItem.shared.show(japanese ? .japanese : .direct)
         if let client { apply(output.result, to: client) }
         if output.state.modeIndicatorMs > 0 {
             modeIndicator.show(japanese ? .japanese : .direct, caret: client.flatMap { modeIndicatorCaret($0) }, milliseconds: output.state.modeIndicatorMs)

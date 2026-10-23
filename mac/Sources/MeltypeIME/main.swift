@@ -248,4 +248,5 @@ guard let bundleIdentifier = Bundle.main.bundleIdentifier,
 candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
 NSRegisterServicesProvider(ModeServices.shared, ModeServices.portName)
 NativeCore.shared.startBackgroundConversion()
+ModeStatusItem.shared.start()
 NSApplication.shared.run()
