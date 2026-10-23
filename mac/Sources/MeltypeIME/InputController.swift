@@ -218,6 +218,7 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
 
     private func rememberMode(caret: NSRect?, showIndicator: Bool = true) {
         ModeSelection.shared.select(mode)
+        ModeStatusItem.shared.update()
         if showIndicator {
             modeIndicator.show(mode, caret: caret)
         } else {

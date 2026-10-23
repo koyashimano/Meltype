@@ -22,6 +22,7 @@ final class ModeServices: NSObject {
          selectWithoutInput: @escaping (ModeShortcutAction) -> Void = { action in
              let mode = action.mode(after: ModeSelection.shared.current)
              ModeSelection.shared.select(mode)
+             ModeStatusItem.shared.update()
              ModeIndicator.shared.show(mode)
          }) {
         self.isMeltypeSelected = isMeltypeSelected
@@ -60,7 +61,7 @@ final class ModeServices: NSObject {
         }
     }
 
-    private static func currentInputSourceIsMeltype() -> Bool {
+    static func currentInputSourceIsMeltype() -> Bool {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
               let pointer = TISGetInputSourceProperty(source, kTISPropertyInputSourceID),
               let identifier = unsafeBitCast(pointer, to: CFTypeRef.self) as? String else { return false }
