@@ -42,6 +42,8 @@ cp "$BIN/MeltypeIME" "$APP/Contents/MacOS/Meltype"
 # 入力ソースの登録をやり直す小さな道具 (#134)。install.sh が入れ替えたあとに呼ぶ。
 cp "$BIN/RegisterInputSource" "$APP/Contents/MacOS/MeltypeRegisterInputSource"
 cp "$BIN/InstallSupport" "$APP/Contents/MacOS/MeltypeInstallSupport"
+# 入力モードをコマンドから切り替える小さな道具 (Vim・Neovim の autocmd などから呼ぶ)。
+cp "$BIN/MeltypeMode" "$APP/Contents/MacOS/MeltypeMode"
 # azooKey が使う llama.framework などの動的なフレームワークも同梱する。
 # 入れていなかったため、1.0.0 は起動できなかった (dyld: Library not loaded: @rpath/llama.framework、#13)。
 for framework in "$BIN"/*.framework; do
