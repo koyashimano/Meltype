@@ -354,7 +354,7 @@ internal static class CompositionKeys
                 PassKey(state);
                 return;
             }
-            var next = CommitBeforeTyping(state, scene, env);
+            var next = CommitBeforeTyping(state, scene, env, ch);
             next.Text = CompositionText.Append(next.Text, ch);
             return;
         }
@@ -459,14 +459,16 @@ internal static class CompositionKeys
     /// F6〜F10 でかな・英字にしたあとなら、見えているとおりに確定して新しい入力を始める (続けて打った文字までカタカナ・大文字にしない)。
     /// 打った文字を入れる入力を返す。
     /// </summary>
-    private static CompositionInput CommitBeforeTyping(CompositionState state, CompositionScene.WithInput scene, CompositionEnv env)
+    private static CompositionInput CommitBeforeTyping(CompositionState state, CompositionScene.WithInput scene, CompositionEnv env, char? next = null)
     {
         var input = scene.Input;
         if (scene is CompositionScene.Converting converting) return CommitOrKeepConversion(state, converting, env);
         // F7・Esc などで表示を変えた後に打ったら、確定して新しく打ち始める (カーソルを動かしたら ModeByKey を外し、カーソルの位置に打つ)
         if (input.ModeByKey)
         {
+            state.WordContinues = next is { } letter && char.IsAsciiLetter(letter);
             CompositionCommit.Commit(state, scene, env);
+            state.WordContinues = false;
             return CompositionLifecycle.Begin(state, env);
         }
         if (CompositionPresentation.SelectedPrediction(input) is { } prediction)

@@ -61,7 +61,7 @@ internal static class CompositionCommit
         }
         CompositionSpelling.RecordCorrection(scene, env, text.Text, suffix);
         if (clauses is not null) LearnClauses(state, input, clauses, env);
-        else if (CompositionLifecycle.Learning(state, input, env) && !input.EscReverted) env.Learning.LearnLanguage(CompositionText.Read(input.Text, env), CompositionText.Segments(CompositionText.Read(CompositionText.Automatic(input.Text), env), env), CompositionText.LearningContext(env));
+        else if (CompositionLifecycle.Learning(state, input, env) && !input.EscReverted) env.Learning.LearnLanguage(CompositionText.Read(input.Text, env), CompositionText.Segments(CompositionText.Read(CompositionText.Automatic(input.Text), env), env), CompositionText.LearningContext(env), state.WordContinues);
         if (clauses is null || clauses.All(CompositionLearning.Learnable))
             RememberPhrase(state, input, env, clauses is not null ? string.Concat(clauses.Select(c => c.IsEnglish ? "" : c.Reading)) : CompositionText.AllKana(CompositionText.Read(input.Text, env), env, final: true), NotationRules.Write(text, env.Settings.Punctuation), english);
         CommitText(state, env, text + ComposedText.English(suffix), english, CompositionText.Raw(CompositionText.Read(input.Text, env)), chosen, preserveText, string.Join("、", rules));
