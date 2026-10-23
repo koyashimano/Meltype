@@ -33,6 +33,15 @@ let package = Package(
             name: "InstallSupport",
             path: "Sources/InstallSupport"
         ),
+        // 入力モードをコマンドから切り替える小さな道具 (Vim・Neovim の autocmd などから呼ぶ)。
+        // Meltype.app に入れる。
+        .executableTarget(
+            name: "MeltypeMode",
+            path: "Sources/MeltypeMode",
+            linkerSettings: [
+                .linkedFramework("Cocoa"),
+            ]
+        ),
         .testTarget(
             name: "MeltypeIMETests",
             dependencies: ["MeltypeIME"],
