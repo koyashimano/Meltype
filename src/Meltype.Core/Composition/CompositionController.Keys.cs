@@ -295,7 +295,7 @@ internal static partial class CompositionController
                 PassKey(state);
                 return;
             }
-            CommitBeforeTyping(state, env);
+            CommitBeforeTyping(state, env, ch);
             CompositionText.Append(state.Text, env, ch);
             return;
         }
@@ -403,12 +403,14 @@ internal static partial class CompositionController
     /// 入力中に次の文字を打ったとき。変換中なら、今の候補で確定して新しい入力を始める (IME と同じ。設定で、確定せずに続けることもできる)。
     /// F6〜F10 でかな・英字にしたあとなら、見えているとおりに確定して新しい入力を始める (続けて打った文字までカタカナ・大文字にしない)。
     /// </summary>
-    private static void CommitBeforeTyping(CompositionState state, CompositionEnv env)
+    private static void CommitBeforeTyping(CompositionState state, CompositionEnv env, char? next = null)
     {
         if (IsConverting(state)) CommitOrKeepConversion(state, env);
         else if (state.ModeByKey)
         {
+            state.WordContinues = next is { } letter && char.IsAsciiLetter(letter);
             Commit(state, env);
+            state.WordContinues = false;
             BeginComposition(state, env);
         }
         else if (SelectedPrediction(state) is { } prediction)

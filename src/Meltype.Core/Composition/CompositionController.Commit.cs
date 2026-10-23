@@ -71,7 +71,7 @@ internal static partial class CompositionController
         }
         RecordCorrection(state, env, converting, text, suffix);
         if (converting) LearnClauses(state, env);
-        else if (Learning(state, env) && !state.EscReverted) env.Learning.LearnLanguage(state.Text, CompositionText.Segments(state.Text, env), CompositionText.LearningContext(state.Text, env));
+        else if (Learning(state, env) && !state.EscReverted) env.Learning.LearnLanguage(state.Text, CompositionText.Segments(state.Text, env), CompositionText.LearningContext(state.Text, env), state.WordContinues);
         if (!converting || state.Clauses.All(CompositionLearning.Learnable))
             RememberPhrase(state, env, converting ? string.Concat(state.Clauses.Select(c => c.IsEnglish ? "" : c.Reading)) : CompositionText.AllKana(state.Text, env, final: true), text, english);
         CommitText(state, env, text + suffix, english, CompositionText.Raw(state.Text), chosen, preserveText, string.Join("、", rules));

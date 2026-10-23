@@ -150,6 +150,9 @@ internal sealed class CompositionState
     // Esc で戻した語は、判定として覚えない
     public bool EscReverted;
 
+    // F6〜F10 のあとに打った英字で確定しているところか (確定した英字は語の途中なので、英語の語として覚えない)。
+    public bool WordContinues;
+
     /// <summary>続けて確定した、英語とも日本語とも読める語 (古い順)。make sure you → have で全部英語に直す。</summary>
     public readonly List<CommitRecord> Correctable = [];
 
