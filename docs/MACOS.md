@@ -97,6 +97,27 @@ brew install --cask yksr-melt/Meltype/meltype
 - 切り替えると、入力カーソルの下 (位置が分からないときは画面の中央) に「自動 | 英数 | Code」を約 1 秒出します。JIS の 英数 / かな キーで切り替えたときも出ます。入力メニューの「入力モードをミニウィンドウで表示」で OFF にできます
 - 最後に選んだモードは、別の入力ソースから Meltype に戻したときや、別の入力欄に移ったときにも使います
 
+同じサービスを、Meltype.app に入っている `MeltypeMode` から呼んで切り替えることもできます。ショートカットキーの設定は要りません。Vim・Neovim で、ノーマルモードでは英数にしたいときなどに使います。
+
+```sh
+~/Library/Input\ Methods/Meltype.app/Contents/MacOS/MeltypeMode automatic   # 自動判定
+~/Library/Input\ Methods/Meltype.app/Contents/MacOS/MeltypeMode direct      # 英数の直接入力
+~/Library/Input\ Methods/Meltype.app/Contents/MacOS/MeltypeMode code        # コード入力
+```
+
+Neovim の例: 挿入モードでは自動判定、それ以外では英数にします。Meltype のモードはアプリ間で共有されるので、フォーカスが外れたら自動判定に戻します。
+
+```lua
+local meltype_mode = vim.fn.expand("~/Library/Input Methods/Meltype.app/Contents/MacOS/MeltypeMode")
+if vim.fn.executable(meltype_mode) == 1 then
+  local function set(mode) vim.system({ meltype_mode, mode }) end
+  local group = vim.api.nvim_create_augroup("meltype_mode", { clear = true })
+  vim.api.nvim_create_autocmd("InsertEnter", { group = group, callback = function() set("automatic") end })
+  vim.api.nvim_create_autocmd({ "InsertLeave", "FocusGained" }, { group = group, callback = function() set("direct") end })
+  vim.api.nvim_create_autocmd("FocusLost", { group = group, callback = function() set("automatic") end })
+end
+```
+
 <a name="ユーザー辞書"></a>
 <img src="images/headings/mac/s02.svg" alt="ユーザー辞書" height="40">
 
