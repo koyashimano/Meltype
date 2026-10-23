@@ -48,6 +48,8 @@ cp "$BIN/MeltypeIME" "$APP/Contents/MacOS/Meltype"
 # 入力ソースの登録をやり直す小さな道具 (#134)。install.sh が入れ替えたあとに呼ぶ。
 cp "$BIN/RegisterInputSource" "$APP/Contents/MacOS/MeltypeRegisterInputSource"
 cp "$BIN/InstallSupport" "$APP/Contents/MacOS/MeltypeInstallSupport"
+# 入力モードをコマンドから切り替える小さな道具 (Vim・Neovim の autocmd などから呼ぶ)。
+cp "$BIN/MeltypeMode" "$APP/Contents/MacOS/MeltypeMode"
 # Swift 6.2 以降は、古い macOS 向けの互換ライブラリ (libswiftCompatibilitySpan.dylib など) を @rpath で読む。
 # macOS 26 は OS に入っているが、13〜15 では無いので、ツールチェーンから同梱する (#20)。
 TOOLCHAIN_SWIFT_LIBS="$(dirname "$(xcrun --find swift)")/../lib"
