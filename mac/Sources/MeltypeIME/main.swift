@@ -246,4 +246,5 @@ terminationSource.setEventHandler {
     exit(0)
 }
 terminationSource.resume()
+ModeStatusItem.shared.start()
 NSApplication.shared.run()
