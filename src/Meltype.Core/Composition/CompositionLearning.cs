@@ -126,8 +126,10 @@ internal sealed partial class CompositionLearning(CompositionServices services, 
     /// <summary>
     /// ユーザーが自分で英字 / かなに直して確定した語を覚える (api と打って F10 で英字にした → 次から api は英字)。
     /// 自動の判定と違う方を選んだときだけ。1 語の英字だけを対象にする。
+    /// wordContinues: 英字にしたあと続けて英字を打って確定した (ge → F10 → t)。確定した英字は語の途中なので、英語として覚えない
+    /// (覚えると、ge で始まる日本語 (げんいん・げんじつ) までずっと英字になっていた)。
     /// </summary>
-    public void LearnLanguage(CompositionText text)
+    public void LearnLanguage(CompositionText text, bool wordContinues = false)
     {
         if (services.Languages is not { } memory) return;
         var raw = text.Raw;
@@ -135,7 +137,7 @@ internal sealed partial class CompositionLearning(CompositionServices services, 
         var automatic = text.Segments();
         switch (text.Mode)
         {
-            case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish):
+            case DisplayMode.HalfWidthAlphanumeric or DisplayMode.FullWidthAlphanumeric when !automatic.All(s => s.IsEnglish) && !wordContinues:
                 memory.Remember(raw, english: true, explicitChoice: true);
                 break;
             case DisplayMode.Hiragana or DisplayMode.Katakana or DisplayMode.HalfWidthKatakana when automatic.Any(s => s.IsEnglish):

@@ -66,7 +66,7 @@ public sealed partial class CompositionController
         }
         RecordCorrection(converting, text, suffix);
         if (converting) LearnClauses();
-        else if (Learning && !_escReverted) _learning.LearnLanguage(_text);
+        else if (Learning && !_escReverted) _learning.LearnLanguage(_text, _wordContinues);
         if (!converting || _clauses.All(CompositionLearning.Learnable))
             RememberPhrase(converting ? string.Concat(_clauses.Select(c => c.IsEnglish ? "" : c.Reading)) : _text.AllKana(final: true), text, english);
         CommitText(text + suffix, english, _text.Raw, chosen, preserveText);
