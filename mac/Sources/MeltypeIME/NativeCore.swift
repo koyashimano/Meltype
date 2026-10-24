@@ -18,6 +18,7 @@ private typealias SelectFunction = @convention(c) (UnsafeMutableRawPointer?, Int
 private typealias SetDirectFunction = @convention(c) (UnsafeMutableRawPointer?, Int32) -> Void
 private typealias TakeModeToggledFunction = @convention(c) (UnsafeMutableRawPointer?) -> Int32
 private typealias IsDirectFunction = @convention(c) (UnsafeMutableRawPointer?) -> Int32
+private typealias CodeInputEnabledFunction = @convention(c) () -> Int32
 private typealias DataDirectoryFunction = @convention(c) () -> UnsafeMutablePointer<CChar>?
 private typealias ReportUrlFunction = @convention(c) (UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 private typealias FreeFunction = @convention(c) (UnsafeMutableRawPointer?) -> Void
@@ -118,6 +119,7 @@ final class NativeCore {
     private let setCodeInputFunction: SetDirectFunction?
     private let takeModeToggledFunction: TakeModeToggledFunction?
     private let isDirectFunction: IsDirectFunction?
+    private let codeInputEnabledFunction: CodeInputEnabledFunction?
     private let dataDirectoryFunction: DataDirectoryFunction?
     private let reportUrlFunction: ReportUrlFunction?
     private let zenzaiModelFunction: DataDirectoryFunction?
@@ -145,6 +147,7 @@ final class NativeCore {
         setCodeInputFunction = symbol("meltype_set_code_input", as: SetDirectFunction.self)
         takeModeToggledFunction = symbol("meltype_take_mode_toggled", as: TakeModeToggledFunction.self)
         isDirectFunction = symbol("meltype_is_direct", as: IsDirectFunction.self)
+        codeInputEnabledFunction = symbol("meltype_code_input_enabled", as: CodeInputEnabledFunction.self)
         dataDirectoryFunction = symbol("meltype_data_directory", as: DataDirectoryFunction.self)
         reportUrlFunction = symbol("meltype_report_url", as: ReportUrlFunction.self)
         zenzaiModelFunction = symbol("meltype_zenzai_model", as: DataDirectoryFunction.self)
@@ -199,6 +202,9 @@ final class NativeCore {
     func setCodeInput(_ session: UnsafeMutableRawPointer?, _ enabled: Bool) {
         setCodeInputFunction?(session, enabled ? 1 : 0)
     }
+
+    /// 入力モードに「コード入力」を出すか (config.json の MacCodeInput)。読めなければ出す。
+    var codeInputEnabled: Bool { (codeInputEnabledFunction?() ?? 1) != 0 }
 
     /// Zenzai の設定 (issue #1130)。「Zenzai を使う」が OFF なら nil、ON なら設定のモデルの場所 (空なら同梱のモデル)。
     var zenzaiModelSetting: String? {

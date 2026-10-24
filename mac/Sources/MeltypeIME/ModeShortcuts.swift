@@ -22,10 +22,11 @@ enum MacInputMode: String, CaseIterable {
         }
     }
 
-    var next: MacInputMode {
+    /// codeEnabled が false なら、コード入力を飛ばす (自動 ⇔ 英数)。
+    func next(codeEnabled: Bool) -> MacInputMode {
         switch self {
         case .automatic: return .direct
-        case .direct: return .code
+        case .direct: return codeEnabled ? .code : .automatic
         case .code: return .automatic
         }
     }
@@ -59,12 +60,13 @@ enum ModeShortcutAction: Int, CaseIterable {
         self = action
     }
 
-    func mode(after current: MacInputMode) -> MacInputMode {
+    /// codeEnabled が false なら、「次の入力モード」でコード入力を飛ばす。コード入力の操作は ModeServices で止める。
+    func mode(after current: MacInputMode, codeEnabled: Bool) -> MacInputMode {
         switch self {
         case .automatic: return .automatic
         case .direct: return .direct
         case .code: return .code
-        case .cycle: return current.next
+        case .cycle: return current.next(codeEnabled: codeEnabled)
         }
     }
 }
@@ -102,5 +104,13 @@ final class ModeSelection {
     func select(_ mode: MacInputMode) {
         current = mode
         defaults.set(mode.rawValue, forKey: Self.storageKey)
+    }
+
+    /// コード入力を無効にしていたら、前に選んでいたコード入力を自動判定に戻す。戻したら true。
+    @discardableResult
+    func dropCode(codeEnabled: Bool) -> Bool {
+        guard current == .code, !codeEnabled else { return false }
+        select(.automatic)
+        return true
     }
 }

@@ -13,7 +13,7 @@ final class ModeShortcutsTests: XCTestCase {
         func selectModeFromService(_ action: ModeShortcutAction) -> Bool {
             guard available else { return false }
             actions.append(action)
-            mode = action.mode(after: mode)
+            mode = action.mode(after: mode, codeEnabled: true)
             return true
         }
     }
@@ -25,14 +25,49 @@ final class ModeShortcutsTests: XCTestCase {
     }
 
     func testCycleAndDirectSelection() {
-        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .automatic), .direct)
-        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .direct), .code)
-        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .code), .automatic)
+        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .automatic, codeEnabled: true), .direct)
+        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .direct, codeEnabled: true), .code)
+        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .code, codeEnabled: true), .automatic)
         for mode in MacInputMode.allCases {
-            XCTAssertEqual(ModeShortcutAction.automatic.mode(after: mode), .automatic)
-            XCTAssertEqual(ModeShortcutAction.direct.mode(after: mode), .direct)
-            XCTAssertEqual(ModeShortcutAction.code.mode(after: mode), .code)
+            XCTAssertEqual(ModeShortcutAction.automatic.mode(after: mode, codeEnabled: true), .automatic)
+            XCTAssertEqual(ModeShortcutAction.direct.mode(after: mode, codeEnabled: true), .direct)
+            XCTAssertEqual(ModeShortcutAction.code.mode(after: mode, codeEnabled: true), .code)
         }
+    }
+
+    func testCodeDisabledCycleSkipsCode() {
+        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .automatic, codeEnabled: false), .direct)
+        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .direct, codeEnabled: false), .automatic)
+        XCTAssertEqual(ModeShortcutAction.cycle.mode(after: .code, codeEnabled: false), .automatic)
+    }
+
+    func testCodeDisabledServiceReachesNeitherTargetNorIdleSelection() {
+        var idleActions: [ModeShortcutAction] = []
+        let services = ModeServices(isMeltypeSelected: { true }, isCodeEnabled: { false }, selectWithoutInput: { idleActions.append($0) })
+        XCTAssertNotNil(invoke(services, "code"))
+        XCTAssertTrue(idleActions.isEmpty)
+        let target = Target()
+        services.activate(target)
+        XCTAssertNotNil(invoke(services, "code"))
+        XCTAssertTrue(target.actions.isEmpty)
+        XCTAssertEqual(target.mode, .automatic)
+        XCTAssertNil(invoke(services, "cycle"))
+        XCTAssertEqual(target.actions, [.cycle])
+    }
+
+    func testSavedCodeIsDroppedOnlyWhenDisabled() {
+        let suite = "ModeSelectionDropCodeTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let selection = ModeSelection(defaults: defaults)
+        selection.select(.code)
+        XCTAssertFalse(selection.dropCode(codeEnabled: true))
+        XCTAssertEqual(selection.current, .code)
+        XCTAssertTrue(selection.dropCode(codeEnabled: false))
+        XCTAssertEqual(ModeSelection(defaults: defaults).current, .automatic)
+        selection.select(.direct)
+        XCTAssertFalse(selection.dropCode(codeEnabled: false))
+        XCTAssertEqual(selection.current, .direct)
     }
 
     func testAllServicesReachActiveTarget() {

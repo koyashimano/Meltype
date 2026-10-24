@@ -24,6 +24,8 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         ModeServices.shared.activate(self)
+        // 起動したあとに config.json でコード入力を無効にしたときも、ここで戻す。
+        if ModeSelection.shared.dropCode(codeEnabled: NativeCore.shared.codeInputEnabled) { ModeStatusItem.shared.update() }
         let selected = ModeSelection.shared.current
         if mode != selected {
             directInput = selected == .direct
@@ -191,11 +193,14 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
 
     override func menu() -> NSMenu! {
         let menu = NSMenu()
-        for (title, action, selected) in [
+        var modes = [
             ("日本語・英語の自動判定", #selector(selectAutomatic(_:)), !codeInput && !directInput),
-            ("英数の直接入力", #selector(selectDirect(_:)), directInput),
-            ("コード入力 (コメント・文字列は日本語)", #selector(selectCode(_:)), codeInput && !directInput)
-        ] {
+            ("英数の直接入力", #selector(selectDirect(_:)), directInput)
+        ]
+        if NativeCore.shared.codeInputEnabled {
+            modes.append(("コード入力 (コメント・文字列は日本語)", #selector(selectCode(_:)), codeInput && !directInput))
+        }
+        for (title, action, selected) in modes {
             let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
             item.target = self
             item.state = selected ? .on : .off
@@ -227,7 +232,7 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
     /// メニューと同じく、現在の表示を確定してからモードとミニウィンドウを更新する。
     func selectModeFromService(_ action: ModeShortcutAction) -> Bool {
         guard client() != nil else { return false }
-        let selected = action.mode(after: mode)
+        let selected = action.mode(after: mode, codeEnabled: NativeCore.shared.codeInputEnabled)
         selectMode(direct: selected == .direct, code: selected == .code, showIndicator: true)
         return true
     }

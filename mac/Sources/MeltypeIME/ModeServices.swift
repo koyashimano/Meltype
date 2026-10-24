@@ -16,16 +16,19 @@ final class ModeServices: NSObject {
     static let portName = "MeltypeModeServices"
     private weak var activeTarget: ModeServiceTarget?
     private let isMeltypeSelected: () -> Bool
+    private let isCodeEnabled: () -> Bool
     private let selectWithoutInput: (ModeShortcutAction) -> Void
 
     init(isMeltypeSelected: @escaping () -> Bool = ModeServices.currentInputSourceIsMeltype,
+         isCodeEnabled: @escaping () -> Bool = { NativeCore.shared.codeInputEnabled },
          selectWithoutInput: @escaping (ModeShortcutAction) -> Void = { action in
-             let mode = action.mode(after: ModeSelection.shared.current)
+             let mode = action.mode(after: ModeSelection.shared.current, codeEnabled: NativeCore.shared.codeInputEnabled)
              ModeSelection.shared.select(mode)
              ModeStatusItem.shared.update()
              ModeIndicator.shared.show(mode)
          }) {
         self.isMeltypeSelected = isMeltypeSelected
+        self.isCodeEnabled = isCodeEnabled
         self.selectWithoutInput = selectWithoutInput
         super.init()
     }
@@ -48,6 +51,11 @@ final class ModeServices: NSObject {
         }
         guard isMeltypeSelected() else {
             error.pointee = "入力ソースでMeltypeを選択してください。"
+            return
+        }
+        // 未確定の文字の確定やミニウィンドウの表示も起こさないよう、入力欄に届ける前に止める。
+        guard action != .code || isCodeEnabled() else {
+            error.pointee = "config.json の MacCodeInput で、コード入力を無効にしています。"
             return
         }
         // 入力カーソルがない状態にも、独立したモード選択操作を用意する。

@@ -346,6 +346,10 @@ public sealed class Settings
      Description("入力中の Control + 英字に、別のキーの働きを割り当てます。「T=F6;Y=F7;U=F8;I=F9;O=F10」のように、英字=キー名を ; で区切って書きます (F キーが無い HHKB やノートパソコン向け)。キー名: F6〜F10・Left・Right・Up・Down・Home・End・Delete・Back・Enter・Esc・Tab。ここに書いた英字は、「Control キーの割り当て」より優先します。")]
     public string ControlKeyBindings { get; set; } = "";
 
+    /// <summary>Mac 版の入力モードに「コード入力」を出すか。Mac 版だけで使う設定なので、Windows 版の設定画面には出さない。</summary>
+    [Browsable(false)]
+    public bool MacCodeInput { get; set; } = true;
+
     [Category("6. 記号・スペース"), DisplayName("カッコを打ったら中にカーソルを移動"),
      Description("カッコだけ（「」・（）・() など）を確定したときに、カーソルをカッコの中へ移動します (← キーを自動で送ります)。")]
     public bool CursorIntoBrackets { get; set; }

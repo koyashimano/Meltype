@@ -240,6 +240,31 @@ public static unsafe class Exports
         }
     }
 
+    /// <summary>最後に読んだ config.json の更新日時と、そのときの MacCodeInput。</summary>
+    private static (DateTime WriteTime, bool Enabled)? s_codeInput;
+
+    /// <summary>
+    /// 入力モードに「コード入力」を出すか (1) 出さないか (0)。設定 MacCodeInput を、config.json が変わったときだけ読み直す
+    /// (入力欄を切り替えるたびに呼ばれる。毎回読むと、書きかけの壊れた config.json を .broken に何度も写す)。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "meltype_code_input_enabled")]
+    public static int CodeInputEnabled()
+    {
+        try
+        {
+            var path = Config.AppPaths.ConfigFile;
+            var writeTime = File.GetLastWriteTimeUtc(path);
+            if (s_codeInput is not { } cached || cached.WriteTime != writeTime)
+                s_codeInput = (writeTime, Config.Settings.Load(path).MacCodeInput);
+            return s_codeInput.Value.Enabled ? 1 : 0;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Error($"MacCodeInput を読めませんでした: {ex}");
+            return 1;
+        }
+    }
+
     /// <summary>入力欄が確定済みの文字の削除に対応しているか (1) いないか (0)。対応していなければ、確定し直しをしない。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_set_can_delete")]
     public static void SetCanDelete(IntPtr handle, int canDelete)

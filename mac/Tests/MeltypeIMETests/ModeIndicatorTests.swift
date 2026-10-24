@@ -20,13 +20,13 @@ final class ModeIndicatorTests: XCTestCase {
 
     func testCycleStartsAfterSavedSelectionAndUsesMenuOrder() {
         XCTAssertEqual(MacInputMode.allCases, [.automatic, .direct, .code])
-        XCTAssertEqual(ModeShortcutAction.allCases.prefix(3).map { $0.mode(after: .automatic) }, MacInputMode.allCases)
+        XCTAssertEqual(ModeShortcutAction.allCases.prefix(3).map { $0.mode(after: .automatic, codeEnabled: true) }, MacInputMode.allCases)
         var selected = MacInputMode.automatic
-        selected = ModeShortcutAction.cycle.mode(after: selected)
+        selected = ModeShortcutAction.cycle.mode(after: selected, codeEnabled: true)
         XCTAssertEqual(selected, .direct)
-        selected = ModeShortcutAction.cycle.mode(after: selected)
+        selected = ModeShortcutAction.cycle.mode(after: selected, codeEnabled: true)
         XCTAssertEqual(selected, .code)
-        selected = ModeShortcutAction.cycle.mode(after: selected)
+        selected = ModeShortcutAction.cycle.mode(after: selected, codeEnabled: true)
         XCTAssertEqual(selected, .automatic)
     }
 
