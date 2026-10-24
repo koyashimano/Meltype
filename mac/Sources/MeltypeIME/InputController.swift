@@ -62,6 +62,9 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown, let client = sender as? IMKTextInput else { return false }
+        // activateServer が呼ばれずにキーが届くことがあるので、キーを受けたらサービスの届け先を自分にする。
+        ModeServices.shared.activate(self)
+        followSelectedMode(client: client)
         if event.keyCode == kVK_Space, event.characters == "　" || event.characters == "\u{00A0}",
            event.modifierFlags.intersection([.command, .control]).isEmpty {
             apply(NativeCore.shared.commit(session), to: client)
@@ -121,6 +124,19 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
             rememberMode(caret: modeIndicatorCaret(client))
         }
         return result.consumed
+    }
+
+    /// 入力モードはすべての入力欄で共有する。サービスやメニューで変えた先が、キーを受けているこの入力欄とは
+    /// 限らない (サービスの届け先が別の入力欄のことや、ないことがある) ので、キーを受けるたびに今のモードに合わせる。
+    /// ここではモードを選んだことにはしないので、ModeSelection もミニウィンドウも変えない。
+    private func followSelectedMode(client: IMKTextInput) {
+        let selected = ModeSelection.shared.current
+        guard mode != selected else { return }
+        apply(NativeCore.shared.commit(session), to: client)
+        directInput = selected == .direct
+        codeInput = selected == .code
+        NativeCore.shared.setDirect(session, directInput)
+        NativeCore.shared.setCodeInput(session, codeInput)
     }
 
     /// フォーカスが外れた・クリックで別の場所に移ったときなど。未確定の内容をそのまま確定する。
