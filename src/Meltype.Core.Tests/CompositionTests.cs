@@ -3449,6 +3449,19 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Conversion_ContextRulesIki()
+    {
+        // 変換エンジンが いきなり などをかなのまま返すと、変換エンジンで語の境界を確かめても (#1352)、いき + なり と読めてしまう。
+        var rules = ContextRules.Load(null);
+        Assert.Equal("行きました", ChooseKana(rules, "いきました", "駅に"), "駅にいきました → 行きました");
+        Assert.Equal(null, ChooseKana(rules, "いきなり", "急に"), "いきなり を 行きなり にしない");
+        Assert.Equal(null, ChooseKana(rules, "いきなりですが", "急に"), "助詞付きでも 行きなり にしない");
+        Assert.Equal(null, ChooseKana(rules, "いきさつを", "急に"), "いきさつ を 行きさつ にしない");
+        Assert.Equal(null, ChooseKana(rules, "いきぐるしい", "急に"), "息苦しい を 行きぐるしい にしない");
+        Assert.Equal(null, ChooseKana(rules, "いきぐるしくて", "急に"), "活用しても 行きぐるしくて にしない");
+    }
+
+    [Test]
     public static void Conversion_ContextRulesPickTheRightWord()
     {
         var k = new Keyboard();
