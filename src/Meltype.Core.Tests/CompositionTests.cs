@@ -2675,6 +2675,41 @@ internal static class CompositionTests
         Assert.True(k.Host.Document == "", "確定しない");
     }
 
+    private static void ControlSemicolon(Keyboard k)
+    {
+        k.Key(VirtualKeys.LControl);
+        k.Key(FakeHost.JisKeys[';'].Vk);
+        k.Key(FakeHost.JisKeys[';'].Vk, up: true);
+        k.Key(VirtualKeys.LControl, up: true);
+    }
+
+    [Test]
+    public static void MacControlSemicolonDoesNotCycleCase()
+    {
+        // F10 と違い、続けて押しても大文字・小文字を切り替えない
+        var k = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        k.Type("toukyou");
+        ControlSemicolon(k);
+        ControlSemicolon(k);
+        ControlSemicolon(k);
+        Assert.Equal("toukyou", k.Showing, "続けて押しても打ったまま");
+
+        // 英単語と判定して英字で見せている語も、1 回目で大文字にしない
+        var english = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        english.Type("hello");
+        ControlSemicolon(english);
+        Assert.Equal("hello", english.Showing);
+        ControlSemicolon(english);
+        Assert.Equal("hello", english.Showing);
+
+        // 変換中も打ったまま
+        var converting = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        converting.Type("toukyou ");
+        ControlSemicolon(converting);
+        ControlSemicolon(converting);
+        Assert.Equal("toukyou", converting.Showing);
+    }
+
     [Test]
     public static void Issue821_LongJapaneseWithTwoCamelCaseNames()
     {
