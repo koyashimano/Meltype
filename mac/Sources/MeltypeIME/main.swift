@@ -208,4 +208,5 @@ NSRegisterServicesProvider(ModeServices.shared, ModeServices.portName)
 // 入力欄を開く前でも、メニューバーにコード入力を出さないように、ここで戻しておく。
 ModeSelection.shared.dropCode(codeEnabled: NativeCore.shared.codeInputEnabled)
 ModeStatusItem.shared.start()
+InputSourceReselection.shared.start()
 NSApplication.shared.run()

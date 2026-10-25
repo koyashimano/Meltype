@@ -39,6 +39,9 @@ final class ModeServices: NSObject {
         if activeTarget === target { activeTarget = nil }
     }
 
+    /// 有効になっている入力欄があるか。
+    var hasActiveTarget: Bool { activeTarget != nil }
+
     @objc func changeInputMode(_ pasteboard: NSPasteboard, userData: String?,
                                error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard Thread.isMainThread else {
