@@ -249,4 +249,5 @@ candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScro
 NSRegisterServicesProvider(ModeServices.shared, ModeServices.portName)
 NativeCore.shared.startBackgroundConversion()
 ModeStatusItem.shared.start()
+InputSourceReselection.shared.start()
 NSApplication.shared.run()

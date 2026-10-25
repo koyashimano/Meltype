@@ -3,6 +3,7 @@
 Meltype のソースコード (このリポジトリ) には、次のものを除いて他者の著作物は含まれていません。
 
 - かな配列 (月配列 U9・花配列・NICOLA・中指NICOLA・TRON 配列) の表 (`src/Meltype.Core/Input/KanaLayout.cs`): [benizara](https://github.com/k-ayaki/benizara) の配列定義ファイルから取りました。MIT License (Copyright (c) 2018 綾木健一郎)
+- `mac/Sources/MeltypeIME/InputSourceReselection.swift` の一部 (フォーカスのあるアプリに入力ソースの選択を頼む部分) は、[macism](https://github.com/laishulu/macism) (MIT License、Copyright (c) 2023 https://github.com/laishulu) の `TSMUtils.swift` をもとにしています。ライセンスの全文はそのファイルの先頭にあります。
 
 ## 配布用パッケージに同梱しているもの
 
