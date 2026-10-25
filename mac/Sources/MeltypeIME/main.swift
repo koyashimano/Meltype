@@ -248,4 +248,5 @@ terminationSource.setEventHandler {
 }
 terminationSource.resume()
 ModeStatusItem.shared.start()
+InputSourceReselection.shared.start()
 NSApplication.shared.run()
