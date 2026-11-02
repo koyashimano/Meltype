@@ -5617,6 +5617,30 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void ZArrowIsNotPartOfRomajiTypo()
+    {
+        // かなの後ろの zl は、見えている → のまま確定する。前のローマ字とつなげて打ち間違いとして直さない
+        // (azl が azo の打ち間違いとして あぞ で確定していた)。矢印の前後の打ち間違いは今までどおり直す。
+        foreach (var (typed, expected) in new[]
+        {
+            ("azl\n", "あ→"), ("azj\n", "あ↓"), ("azk\n", "あ↑"), ("azh\n", "あ←"), ("iizl\n", "いい→"), ("azlkara\n", "あ→から"),
+            ("azl/\n", "あ→/"), ("zlonegaishimsu\n", "→おねがいします"), ("onegaishimsuzl\n", "おねがいします→"),
+        })
+        {
+            var k = new Keyboard();
+            k.Type(typed);
+            Assert.Equal(expected, k.Host.Document, typed);
+        }
+        var shown = new Keyboard();
+        shown.Type("azl/");
+        Assert.Equal("あ→/", shown.Showing, "記号を打っても → のまま見える");
+        // zz の次の l は、前の z が っ になっていても矢印にしない
+        var puzzle = new Keyboard();
+        puzzle.Type("puzzl");
+        Assert.True(puzzle.Showing?.Contains('→') == false, "puzzl: " + puzzle.Showing);
+    }
+
+    [Test]
     public static void Issue1008_ZSymbolsCanBeTurnedOff()
     {
         // Issue #1008: 設定「z + 記号・hjkl で記号・矢印を入れる」を OFF にすると、z はほかの英字と同じ (1000Hz. の z. を … にしない)
