@@ -134,7 +134,9 @@ internal static class CompositionText
             }
             state.Pending.Insert(0, pulled.ToString());
             // zh / zj / zk / zl → ← ↓ ↑ →。z が 1 文字のときだけ (puzzle の zz の次の l は英単語)。
-            if (state.Pending.Length == 1 && char.ToLowerInvariant(state.Pending[0]) == 'z' && env.Settings.ZSymbols && ZSymbol(c) is { } arrow)
+            // zz の前の z は先に っ の単位になり、打ちかけには z が 1 文字のみ残るので、直前の っ も見る。
+            var afterDoubledZ = state.Units.Count > 0 && state.Units[^1] is { Kana: "っ", Raw: ['z' or 'Z'] };
+            if (state.Pending.Length == 1 && char.ToLowerInvariant(state.Pending[0]) == 'z' && !afterDoubledZ && env.Settings.ZSymbols && ZSymbol(c) is { } arrow)
             {
                 var raw = state.Pending[0].ToString() + c;
                 state.Pending.Clear();
@@ -305,7 +307,7 @@ internal static class CompositionText
     {
         // 最後の数字の位置 (その後ろが英字だけのとき)
         var digit = state.Units.Count - 1;
-        while (digit >= 0 && IsLetters(state.Units[digit].Raw)) digit--;
+        while (digit >= 0 && IsLetters(state.Units[digit])) digit--;
         if (digit < 0 || state.Units[digit].Raw is not [var d] || !char.IsAsciiDigit(d)) return;
         var run = string.Concat(state.Units.Skip(digit + 1).Select(u => u.Raw)) + state.Pending;
         var lower = run.ToLowerInvariant();
@@ -958,14 +960,14 @@ internal static class CompositionText
         var start = 0;
         while (start < state.Units.Count)
         {
-            if (!IsLetters(state.Units[start].Raw) || IsLaughter(state.Units[start]))
+            if (!IsLetters(state.Units[start]) || IsLaughter(state.Units[start]))
             {
                 offset += state.Units[start].Raw.Length;
                 start++;
                 continue;
             }
             var end = start;
-            while (end < state.Units.Count && IsLetters(state.Units[end].Raw) && !IsLaughter(state.Units[end])) end++;
+            while (end < state.Units.Count && IsLetters(state.Units[end]) && !IsLaughter(state.Units[end])) end++;
             var atEnd = end == state.Units.Count;
             var letters = string.Concat(state.Units.Skip(start).Take(end - start).Select(u => u.Raw)) + (atEnd ? CompositionText.Pending(state) : "");
             var runOffset = offset;
@@ -1012,13 +1014,13 @@ internal static class CompositionText
         var withPending = state.Pending.Length > 0;
         while (end > 0 || withPending)
         {
-            if (!withPending && !IsLetters(state.Units[end - 1].Raw))
+            if (!withPending && !IsLetters(state.Units[end - 1]))
             {
                 end--;
                 continue;
             }
             var runStart = end;
-            while (runStart > 0 && IsLetters(state.Units[runStart - 1].Raw)) runStart--;
+            while (runStart > 0 && IsLetters(state.Units[runStart - 1])) runStart--;
             CompositionText.KeepLaughterAt(state, env, end, withPending);
             withPending = false;
             end = runStart;
@@ -1045,12 +1047,12 @@ internal static class CompositionText
         var laugh = letters;
         // 設定「かな + w を笑いにする」: 1 つのかなの音 (ね・さ) だけの後ろの w は、その 2 つで英単語 (new・saw) にしない (issue #713・#492)。
         // もっと長い英単語 (snow・window) の終わりは、今までどおり英単語
-        var soleSyllable = state.LaughterAfterKana && start > 0 && state.Units[start - 1].Kana is [>= 'ぁ' and <= 'ん'] && state.Units[start - 1].Raw.All(char.IsAsciiLetter);
-        for (var i = start - 1; i >= 0 && state.Units[i].Raw.Length > 0 && state.Units[i].Raw.All(char.IsAsciiLetter); i--)
+        var soleSyllable = state.LaughterAfterKana && start > 0 && state.Units[start - 1].Kana is [>= 'ぁ' and <= 'ん'] && IsLetters(state.Units[start - 1]);
+        for (var i = start - 1; i >= 0 && IsLetters(state.Units[i]); i--)
         {
             letters = state.Units[i].Raw + letters;
             if (soleSyllable && i == start - 1) continue;
-            var runStart = i == 0 || !IsLetters(state.Units[i - 1].Raw);
+            var runStart = i == 0 || !IsLetters(state.Units[i - 1]);
             if (letters.Length >= 3 && (runStart ? env.Detector.IsKnownEnglishWord(LearningContext(state, env), letters) : env.Detector.IsListedEnglishWord(LearningContext(state, env), letters.ToLowerInvariant()))) return end;
         }
         state.Units.RemoveRange(start, end - start);
@@ -1131,7 +1133,14 @@ internal static class CompositionText
         return false;
     }
 
-    private static bool IsLetters(string raw) => raw.Length > 0 && raw.All(char.IsAsciiLetter);
+    /// <summary>
+    /// 英字を打った単位か。z + hjkl の矢印 (zl → →) は、打ったのは英字でも記号として扱う
+    /// (英字の並びに含めると、azl を打ち間違いとして azo に直し、あ→ が あぞ で確定していた)。
+    /// </summary>
+    private static bool IsLetters(CompositionUnit unit) => unit.Raw.Length > 0 && unit.Raw.All(char.IsAsciiLetter) && !IsZArrow(unit);
+
+    /// <summary>z + hjkl で入れた矢印の単位 (zh zj zk zl → ← ↓ ↑ →)。</summary>
+    private static bool IsZArrow(CompositionUnit unit) => unit.Raw is ['z' or 'Z', var key] && unit.Kana is [var arrow] && ZSymbol(key) == arrow;
 
     /// <summary>単位 [start, end) の読みを、正しい読み (カタカナ) に置き換える。end が単位の数を超えるときは語末の n も含む。</summary>
     public static void ReplaceReading(CompositionTextState state, int start, int end, string rightKatakana)
