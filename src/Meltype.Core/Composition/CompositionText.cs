@@ -388,7 +388,9 @@ internal static partial class CompositionText
             }
             state.Pending.Insert(0, pulled.ToString());
             // zh / zj / zk / zl → ← ↓ ↑ →。z が 1 文字のときだけ (puzzle の zz の次の l は英単語)。
-            if (state.Pending.Length == 1 && char.ToLowerInvariant(state.Pending[0]) == 'z' && env.Settings.ZSymbols && ZSymbol(c) is { } arrow)
+            // zz の前の z は先に っ の単位になり、打ちかけには z が 1 文字のみ残るので、直前の っ も見る。
+            var afterDoubledZ = state.Units.Count > 0 && state.Units[^1] is { Kana: "っ", Raw: ['z' or 'Z'] };
+            if (state.Pending.Length == 1 && char.ToLowerInvariant(state.Pending[0]) == 'z' && !afterDoubledZ && env.Settings.ZSymbols && ZSymbol(c) is { } arrow)
             {
                 var raw = state.Pending[0].ToString() + c;
                 state.Pending.Clear();

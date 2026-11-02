@@ -6854,6 +6854,15 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void DoubledZThenLIsNotArrow()
+    {
+        // zz の次の l は、前の z が っ になっていても矢印にしない
+        var puzzle = new Keyboard();
+        puzzle.Type("puzzl");
+        Assert.True(puzzle.Showing?.Contains('→') == false, "puzzl: " + puzzle.Showing);
+    }
+
+    [Test]
     public static void Issue1008_ZSymbolsCanBeTurnedOff()
     {
         // Issue #1008: 設定「z + 記号・hjkl で記号・矢印を入れる」を OFF にすると、z はほかの英字と同じ (1000Hz. の z. を … にしない)
