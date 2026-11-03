@@ -213,6 +213,18 @@ internal static class ImeContractTests
     }
 
     [Test]
+    public static void MacControlSemicolon_ThroughTheFront()
+    {
+        // Mac のフロントは、Control + ; を仮想キーなし (vk 0) で、文字 ; と ctrl のみで送る
+        var front = new Front { Settings = new() { LiveConversion = false, ControlKeys = ControlKeyLayout.Mac } };
+        front.Type("toukyou");
+        Assert.Equal("とうきょう", front.Composition["t1"], front.Trace);
+        Assert.True(Consumed(front.Key(0, ';', ctrl: true)), "Control + ; は変換ボックスで使う\n" + front.Trace);
+        Assert.Equal("toukyou", front.Composition["t1"], "半角英数にする\n" + front.Trace);
+        Assert.Equal("", front.Document, "確定しない\n" + front.Trace);
+    }
+
+    [Test]
     public static void BackSpace_And_Esc()
     {
         var front = new Front();
