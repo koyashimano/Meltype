@@ -412,6 +412,19 @@ internal static class CompositionTests
         /// <summary>入力欄をクリックした (キャレットが動いたかもしれない)。</summary>
         public void Click() => Send(ImeEventType.CaretMoved, caret: new ImeCaret { Moved = true, PassedKey = 0 });
 
+        /// <summary>
+        /// Control を押したまま vk を押して離す。Mac のフロントと同じく、Control を押していても打つ文字を送る
+        /// (KeyMapping.text の charactersIgnoringModifiers)。Meltype キーボードは送らないので、<see cref="Key"/> では送らない。
+        /// </summary>
+        public void ControlWithChar(int vk)
+        {
+            Key(VirtualKeys.LControl);
+            _now += 30;
+            var ch = Host.CharFromKey(vk, false) is { } c ? c : 0;
+            Send(ImeEventType.KeyPressed, new ImeKey { Vk = vk, Ch = ch, Ctrl = true }, vk: vk);
+            Key(VirtualKeys.LControl, up: true);
+        }
+
         /// <summary>変換ボックスに入力中か (本体がキーを受け取るか)。</summary>
         public bool Captured => _composing;
 
@@ -2922,6 +2935,17 @@ internal static class CompositionTests
         normal.Key('K', up: true);
         normal.Key(VirtualKeys.LControl, up: true);
         Assert.True(normal.Showing != "トウキョウ", "OFF は今までどおり");
+    }
+
+    [Test]
+    public static void MacControlSemicolonConvertsToHalfWidthAlphanumeric()
+    {
+        var k = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        k.Type("toukyou");
+        Assert.Equal("とうきょう", k.Showing);
+        k.ControlWithChar(FakeHost.JisKeys[';'].Vk);
+        Assert.Equal("toukyou", k.Showing, "Control+; で半角英数 (F10 と同じ)");
+        Assert.True(k.Host.Document == "", "確定しない");
     }
 
     [Test]
