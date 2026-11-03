@@ -2662,6 +2662,20 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void MacControlSemicolonConvertsToHalfWidthAlphanumeric()
+    {
+        var k = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        k.Type("toukyou");
+        Assert.Equal("とうきょう", k.Showing);
+        k.Key(VirtualKeys.LControl);
+        k.Key(FakeHost.JisKeys[';'].Vk);
+        k.Key(FakeHost.JisKeys[';'].Vk, up: true);
+        k.Key(VirtualKeys.LControl, up: true);
+        Assert.Equal("toukyou", k.Showing, "Control+; で半角英数 (F10 と同じ)");
+        Assert.True(k.Host.Document == "", "確定しない");
+    }
+
+    [Test]
     public static void Issue821_LongJapaneseWithTwoCamelCaseNames()
     {
         var k = new Keyboard();

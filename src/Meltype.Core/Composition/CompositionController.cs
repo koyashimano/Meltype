@@ -737,7 +737,7 @@ public sealed class CompositionController
                 vk = bound;
             }
             // 設定「Control キーの割り当て」が macOS 風: 組み込みの Ctrl+U/I/O/P/H より先に見る (issue #643)
-            else if (!_text.IsEmpty && _options.ControlKeys() == Config.ControlKeyLayout.Mac && MacControlShortcut(vk) is { } mac)
+            else if (!_text.IsEmpty && _options.ControlKeys() == Config.ControlKeyLayout.Mac && MacControlShortcut(vk, _host.CharFromKey(e, false)) is { } mac)
             {
                 if (mac is ResizeExtend or ResizeShrink)
                 {
@@ -3444,9 +3444,10 @@ public sealed class CompositionController
 
     /// <summary>
     /// 設定「Control キーの割り当て」が macOS 風のときの割り当て。J K L = ひらがな / カタカナ / 全角英字、H D = 1 文字消す、
-    /// N P = 次 / 前の候補、B F A E = カーソル移動、O I = 文節を伸ばす / 縮める。
+    /// N P = 次 / 前の候補、B F A E = カーソル移動、O I = 文節を伸ばす / 縮める、; = 半角英数。
+    /// ; は配列ごとに仮想キーが違う (US は 0xBA、JIS は 0xBB、Mac・Linux は文字だけ) ので、入力される文字で見る。
     /// </summary>
-    private static int? MacControlShortcut(int vk) => vk switch
+    private static int? MacControlShortcut(int vk, char? typed) => vk switch
     {
         'J' => VirtualKeys.F6,
         'K' => VirtualKeys.F7,
@@ -3461,6 +3462,7 @@ public sealed class CompositionController
         'E' => 0x23,
         'O' => ResizeExtend,
         'I' => ResizeShrink,
+        _ when typed == ';' => VirtualKeys.F10,
         _ => null,
     };
 
