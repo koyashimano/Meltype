@@ -2710,6 +2710,48 @@ internal static class CompositionTests
         Assert.Equal("toukyou", converting.Showing);
     }
 
+    private static void ControlKey(Keyboard k, int vk)
+    {
+        k.Key(VirtualKeys.LControl);
+        k.Key(vk);
+        k.Key(vk, up: true);
+        k.Key(VirtualKeys.LControl, up: true);
+    }
+
+    [Test]
+    public static void MacControlKeysAffectOnlyTheSelectedClause()
+    {
+        // macOS 標準の日本語入力と同じく、変換中の Control + J / K / L / ; は選んでいる文節のみを変える。
+        // 設定 FunctionKeysAffectSelectedClause は OFF のまま
+        var k = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        k.Type("tanniwotoru ");
+        Assert.Equal("単位を|取る", string.Join("|", k.Host.View!.Clauses!));
+        ControlKey(k, 'K');
+        Assert.True(k.Host.View!.Converting, "変換は続く");
+        Assert.Equal("タンイヲ|取る", string.Join("|", k.Host.View!.Clauses!), "Control+K で選んでいる文節のみカタカナ");
+        ControlKey(k, 'J');
+        Assert.Equal("たんいを|取る", string.Join("|", k.Host.View!.Clauses!), "Control+J でひらがな");
+        ControlKey(k, 'L');
+        Assert.Equal("ｔａｎｎｉｗｏ|取る", string.Join("|", k.Host.View!.Clauses!), "Control+L で全角英字");
+        ControlSemicolon(k);
+        Assert.Equal("tanniwo|取る", string.Join("|", k.Host.View!.Clauses!), "Control+; で半角英数");
+        ControlSemicolon(k);
+        Assert.Equal("tanniwo|取る", string.Join("|", k.Host.View!.Clauses!), "続けて押しても打ったまま");
+
+        // Control+F で次の文節に移ってから変える
+        ControlKey(k, 'F');
+        ControlKey(k, 'K');
+        Assert.Equal("tanniwo|トル", string.Join("|", k.Host.View!.Clauses!), "2 番目の文節のみカタカナ");
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("tanniwoトル", k.Host.Document);
+
+        // F7 のキーそのものは、今までどおり設定に従って全体を変える
+        var f7 = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        f7.Type("tanniwotoru ");
+        f7.Press(VirtualKeys.F7);
+        Assert.Equal("タンイヲトル", f7.Showing, "F7 は全体をカタカナ");
+    }
+
     [Test]
     public static void Issue821_LongJapaneseWithTwoCamelCaseNames()
     {
