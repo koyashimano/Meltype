@@ -335,7 +335,7 @@ public sealed class Settings
     public bool PartialCommit { get; set; }
 
     [Category("7. キー操作"), DisplayName("Control キーの割り当て"),
-     Description("入力中の Control + 英字の割り当てです。標準: Ctrl + U / I / O / P で F6 / F7 / F10 / F9、Ctrl + H で BackSpace。ATOK 風: 標準に加えて、変換中の Ctrl + K で選んでいる文節を縮め、Ctrl + L で伸ばします (Shift + ← → と同じ)。macOS 風: Control + J / K / L / ; をひらがな / カタカナ / 全角英字 / 半角英数 (F6 / F7 / F9 / F10) に、Control + H / D を前 / 後ろの 1 文字を消す、N / P を次 / 前の候補、B / F / A / E をカーソル移動、O / I を変換中の文節を伸ばす / 縮める、にします (macOS 標準の日本語入力と同じ)。")]
+     Description("入力中の Control + 英字の割り当てです。標準: Ctrl + U / I / O / P で F6 / F7 / F10 / F9、Ctrl + H で BackSpace。ATOK 風: 標準に加えて、変換中の Ctrl + K で選んでいる文節を縮め、Ctrl + L で伸ばします (Shift + ← → と同じ)。macOS 風: Control + J / K / L / ; をひらがな / カタカナ / 全角英字 / 半角英数 (F6 / F7 / F9 / F10) に、Control + H / D を前 / 後ろの 1 文字を消す、N / P を次 / 前の候補、B / F / A / E をカーソル移動、O / I を変換中の文節を伸ばす / 縮める、にします (macOS 標準の日本語入力と同じ)。文節に分けて変換しているときの Control + J / K / L / ; は、選んでいる文節のみを変えます。")]
     public ControlKeyLayout ControlKeys { get; set; } = ControlKeyLayout.Standard;
 
     [Category("7. キー操作"), DisplayName("Control キーの個別の割り当て"),

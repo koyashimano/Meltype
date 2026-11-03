@@ -93,15 +93,21 @@ public sealed partial class CompositionController
                     if (_converting) Resize(mac == ResizeExtend ? +1 : -1);
                     return;
                 }
+                // 変換中に文節が 2 つ以上あれば、Control + J / K / L / ; は選んでいる文節のみを変える (macOS 標準の日本語入力と同じ)。
+                // 設定 FunctionKeysAffectSelectedClause が OFF でも同じ。F6〜F10 のキーは、今までどおりその設定に従う。
+                if (_converting && _clauses.Count > 1 && mac is VirtualKeys.F6 or VirtualKeys.F7 or VirtualKeys.F9 or HalfWidthAsTyped)
+                {
+                    ApplyFunctionKeyToClause(mac == HalfWidthAsTyped ? VirtualKeys.F10 : mac);
+                    return;
+                }
                 // Control + ; は F10 と違い、続けて押しても大文字・小文字を切り替えず、打ったままの半角英数にする。
-                // 設定 FunctionKeysAffectSelectedClause による文節ごとの F10 は大文字・小文字を切り替えないので、F10 に任せる。
-                if (mac == HalfWidthAsTyped && !(_converting && _settings().FunctionKeysAffectSelectedClause && _clauses.Count > 1))
+                if (mac == HalfWidthAsTyped)
                 {
                     SetMode(DisplayMode.HalfWidthAlphanumeric);
                     _modeByKey = true;
                     return;
                 }
-                vk = mac == HalfWidthAsTyped ? VirtualKeys.F10 : mac;
+                vk = mac;
             }
             else if (!_text.IsEmpty && ControlShortcut(vk) is { } function)
             {
@@ -854,6 +860,7 @@ public sealed partial class CompositionController
     /// <summary>
     /// 設定「Control キーの割り当て」が macOS 風のときの割り当て。J K L = ひらがな / カタカナ / 全角英字、H D = 1 文字消す、
     /// N P = 次 / 前の候補、B F A E = カーソル移動、O I = 文節を伸ばす / 縮める、; = 半角英数 (F10 と違い、続けて押しても打ったまま)。
+    /// 変換中に文節が 2 つ以上あれば、J K L ; は選んでいる文節のみを変える。
     /// ; は配列ごとに仮想キーが違う (US は 0xBA、JIS は 0xBB、Mac・Linux は文字のみ) ので、入力される文字で見る。
     /// </summary>
     private static int? MacControlShortcut(int vk, char? typed = null) => vk switch
