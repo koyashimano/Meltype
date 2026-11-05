@@ -110,10 +110,11 @@ public sealed class MeltypeRuntime : IDisposable
     /// 入力欄 1 つ分の本体を作る。converter は OS ごとの変換エンジン、moreCandidates は読みに対する OS の候補の一覧 (無ければ null)。
     /// autoSpacing は、英単語の前後の空白を Meltype が整えるか (変換エンジンが空白を入れない OS)。
     /// directModeDetection なら、英数状態で打ち始めた語がローマ字かを判定して日本語に戻す (設定「英数状態で自動判定」。今は Windows だけ)。
+    /// candidatesOnSecondSpace なら、1 回目の Space では候補の一覧を出さず、2 回目から出す (<see cref="CompositionServices.CandidatesOnSecondSpace"/>)。
     /// </summary>
     /// <param name="settings">入力欄のアプリの設定 (アプリ別設定を反映したもの)。null なら config.json の設定。</param>
     public MeltypeSession CreateSession(IKanjiConverter converter, Func<Settings>? settings = null, Func<string, IReadOnlyList<string>>? moreCandidates = null,
-        bool autoSpacing = false, bool directModeDetection = false)
+        bool autoSpacing = false, bool directModeDetection = false, bool candidatesOnSecondSpace = false)
     {
         var current = settings ?? (() => Settings.Current);
         UserDictionary.Refresh();
@@ -123,6 +124,7 @@ public sealed class MeltypeRuntime : IDisposable
             Predictor = new Predictor(Phrases, UserDictionary, History),
             MoreCandidates = moreCandidates,
             AutomaticEnglishSpacing = () => autoSpacing,
+            CandidatesOnSecondSpace = () => candidatesOnSecondSpace,
             // Mac・Linux では判定しない。判定すると、判定中の英字があるときにかなキーで日本語に切り替わらない (#1724)
             ClassifyDirect = directModeDetection && OperatingSystem.IsWindows() ? (letters, final) => ClassifyDirect(letters, final, current()) : null,
         };

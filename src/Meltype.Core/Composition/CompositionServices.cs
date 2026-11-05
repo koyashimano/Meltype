@@ -67,6 +67,13 @@ public sealed record CompositionServices
 
     public Func<bool> AutomaticEnglishSpacing { get; init; } = () => false;
 
+    /// <summary>
+    /// macOS 標準の日本語入力と同じく、変換を始めた Space (1 回目) では文全体を文節に区切って変換し、候補の一覧は出さないか。
+    /// 2 回目の Space (↓・↑・Shift+Space・PageDown なども) で、選んでいる文節を次の候補にして一覧を出す。一覧を出すまでは数字キーで候補を選ばない。
+    /// 設定ではなく、フロント (Mac 版) が決める。
+    /// </summary>
+    public Func<bool> CandidatesOnSecondSpace { get; init; } = () => false;
+
     /// <summary>ユーザーが英字 / かなに直した語の学習。</summary>
     public LanguageMemory? Languages { get; init; }
 

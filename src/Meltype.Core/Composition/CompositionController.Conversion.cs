@@ -91,6 +91,7 @@ public sealed partial class CompositionController
         _conversionPrefersJapanese = preferJapanese;
         _clausesEdited = false;
         _tabStartedConversion = false;
+        _candidatesShown = false;
         var segments = _text.ConversionSegments();
         var utility = Utilities(segments);
         if (utility is { Placement: UtilityPlacement.Replace })
@@ -696,6 +697,12 @@ public sealed partial class CompositionController
     {
         var clause = _clauses[_selectedClause];
         if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
+        // 一覧を出す前は、Space・↓ と同じく一覧を出して次 (前) の候補にする (見ていないページに飛ばない)
+        if (!CandidatesVisible)
+        {
+            NextCandidate(step);
+            return;
+        }
         var pages = (clause.Candidates.Count + CandidatePageSize - 1) / CandidatePageSize;
         if (pages <= 1) return;
         var page = (Math.Max(0, clause.Index) / CandidatePageSize + step + pages) % pages;
@@ -707,6 +714,7 @@ public sealed partial class CompositionController
     {
         var clause = _clauses[_selectedClause];
         if (!clause.Expanded) Expand(clause);
+        _candidatesShown = true;
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
     }

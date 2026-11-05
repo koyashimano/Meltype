@@ -177,6 +177,12 @@ public sealed partial class CompositionController
     /// <summary>今の変換を Tab で始めたか (変換中の Tab で候補を送るため。issue #219)。</summary>
     private bool _tabStartedConversion;
 
+    // 今の変換で候補の一覧を出したか (CandidatesOnSecondSpace のとき、変換を始めたときは出さない)
+    private bool _candidatesShown;
+
+    /// <summary>今の変換で、候補の一覧を見せるか。</summary>
+    private bool CandidatesVisible => _candidatesShown || !_services.CandidatesOnSecondSpace();
+
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public void ForgetLastCommit()
     {

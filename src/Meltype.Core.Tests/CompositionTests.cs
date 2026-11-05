@@ -208,6 +208,8 @@ internal static class CompositionTests
         public bool LaughterAfterKana { get => Settings.LaughterAfterKana; set => Settings.LaughterAfterKana = value; }
         public bool ContextualLearning { get => Settings.ContextualLearning; set => Settings.ContextualLearning = value; }
         public bool ShowCandidatesWhileTyping { get => Settings.ShowCandidatesWhileTyping; set => Settings.ShowCandidatesWhileTyping = value; }
+        /// <summary>1 回目の Space では候補の一覧を出さない (Mac 版。設定ではなくフロントが決める)。</summary>
+        public bool CandidatesOnSecondSpace { get; set; }
         public bool GitHubIssueCandidates { get => Settings.GitHubIssueCandidates; set => Settings.GitHubIssueCandidates = value; }
         public string GitHubRepository { get => Settings.GitHubRepository; set => Settings.GitHubRepository = value; }
         public GitHubIssueTitles? GitHubTitles { get; set; }
@@ -291,6 +293,7 @@ internal static class CompositionTests
                 TranslationHistory = translationHistory,
                 RomajiTypos = Typos,
                 GitHubTitles = () => GitHubTitles,
+                CandidatesOnSecondSpace = () => CandidatesOnSecondSpace,
                 UtcNow = () => UtcNow,
                 LocalTimeZone = () => LocalTimeZone,
                 Predictor = predictor,
@@ -1067,6 +1070,152 @@ internal static class CompositionTests
         k.Press(VirtualKeys.Space);
         k.Key(VirtualKeys.LShift, up: true);
         Assert.Equal(k.Host.View!.Candidates.Count - 1, k.Host.View!.SelectedIndex, "先頭から戻ると最後の候補へ");
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_FirstSpaceConvertsWholeWithoutList()
+    {
+        // Mac: macOS 標準の日本語入力と同じく、1 回目の Space は全体を文節に区切って変換するのみで、候補の一覧は出さない。
+        // 2 回目の Space で、最初の文節のみを次の候補にして一覧を出す。
+        var k = new Keyboard(moreCandidates: r => r == "たんいを" ? ["単位を", "単位お", "たんいを"] : []) { CandidatesOnSecondSpace = true };
+        k.Type("tanniwotoru ");
+        var view = k.Host.View!;
+        Assert.True(view.Converting, "変換している");
+        Assert.Equal("単位を取る", view.Text);
+        Assert.Equal(0, view.Candidates.Count, "1 回目は一覧を出さない: " + string.Join(",", view.Candidates));
+        Assert.Equal(0, view.SelectedClause);
+        k.Press(VirtualKeys.Space);
+        view = k.Host.View!;
+        Assert.True(view.Candidates.Count >= 2, "2 回目で一覧を出す");
+        Assert.Equal(1, view.SelectedIndex, "2 回目で次の候補に進む");
+        Assert.Equal(view.Candidates[1], view.Clauses![0]);
+        Assert.Equal("取る", view.Clauses![1], "最初の文節のみを変える");
+        k.Press(VirtualKeys.Space);
+        Assert.Equal(2, k.Host.View!.SelectedIndex, "3 回目以降も最初の文節の候補を進める");
+        Assert.Equal("取る", k.Host.View!.Clauses![1]);
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_DownOpensList()
+    {
+        // ↓ でも、2 回目の Space と同じく次の候補にして一覧を出す
+        var k = new Keyboard { CandidatesOnSecondSpace = true };
+        k.Type("kawa ");
+        Assert.Equal(0, k.Host.View!.Candidates.Count);
+        k.Press(VirtualKeys.Down);
+        Assert.True(k.Host.View!.Candidates.Count >= 2 && k.Host.View.SelectedIndex == 1, "↓ で一覧を出して次の候補へ");
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_DigitBeforeListIsTyped()
+    {
+        // 一覧を出す前の数字キーは、見えない候補を選ばずに、今の変換を確定して打った数字にする
+        var k = new Keyboard { CandidatesOnSecondSpace = true };
+        k.Type("kawa ");
+        k.Press('2');
+        Assert.True(k.Host.Document.StartsWith('川'), "今の候補で確定する: " + k.Host.Document);
+        Assert.Equal("川2", k.Host.Document + k.Host.View?.Text, "2 は打った数字になる");
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_DigitAfterListSelects()
+    {
+        var k = new Keyboard { CandidatesOnSecondSpace = true };
+        k.Type("kawa ");
+        k.Press(VirtualKeys.Space);
+        var third = k.Host.View!.Candidates[2];
+        k.Press('3');
+        Assert.Equal(third, k.Host.Document);
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_PageDownBeforeListGoesToNextCandidate()
+    {
+        // 一覧を出す前の PageDown は、見ていないページに飛ばずに Space と同じく次の候補にする
+        var many = Enumerable.Range(1, 20).Select(i => $"川{i}").ToList();
+        var k = new Keyboard(moreCandidates: r => r == "かわ" ? many : []) { CandidatesOnSecondSpace = true };
+        k.Type("kawa ");
+        k.Press(VirtualKeys.PageDown);
+        Assert.True(k.Host.View!.Candidates.Count >= 2, "一覧を出す");
+        Assert.Equal(1, k.Host.View!.SelectedIndex);
+        k.Press(VirtualKeys.PageDown);
+        Assert.Equal(9, k.Host.View!.SelectedIndex, "一覧を出したあとはページ送り");
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_TabConversionOpensListOnSecondTab()
+    {
+        var k = new Keyboard(tabConversion: true) { CandidatesOnSecondSpace = true };
+        k.Type("kawa");
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View!.Converting && k.Host.View.Candidates.Count == 0, "1 回目の Tab は一覧を出さない");
+        k.Press(VirtualKeys.Tab);
+        Assert.True(k.Host.View!.Candidates.Count >= 2 && k.Host.View.SelectedIndex == 1, "2 回目の Tab で一覧を出して次の候補へ");
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_ArrowBeforeConversionSelectsClauseWithoutList()
+    {
+        // 変換前の ← で文節の選択に入っても一覧は出さない。続く Space で、選んだ (最後の) 文節のみを次の候補にする
+        var k = new Keyboard(moreCandidates: r => r == "とる" ? ["取る", "撮る", "とる"] : []) { CandidatesOnSecondSpace = true };
+        k.Type("tanniwotoru");
+        k.Press(VirtualKeys.Left);
+        Assert.True(k.Host.View!.Converting && k.Host.View.Candidates.Count == 0, "← では一覧を出さない");
+        Assert.Equal(1, k.Host.View!.SelectedClause);
+        k.Press(VirtualKeys.Space);
+        Assert.Equal(1, k.Host.View!.SelectedIndex);
+        Assert.Equal("単位を", k.Host.View!.Clauses![0], "最初の文節は変えない");
+        Assert.Equal(k.Host.View!.Candidates[1], k.Host.View!.Clauses![1]);
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_ListStaysOpenWhenMovingClause()
+    {
+        // 一覧を出したあとに → で文節を移ると、移った先の文節の一覧を出す
+        var k = new Keyboard(moreCandidates: r => r switch { "たんいを" => ["単位を", "たんいを"], "とる" => ["取る", "撮る", "とる"], _ => [] })
+        { CandidatesOnSecondSpace = true };
+        k.Type("tanniwotoru ");
+        k.Press(VirtualKeys.Space);
+        k.Press(VirtualKeys.Right);
+        Assert.True(k.Host.View!.Candidates.Contains("撮る"), "移った先の文節の一覧: " + string.Join(",", k.Host.View.Candidates));
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_RefreshKeepsWhetherListIsShown()
+    {
+        // 変換の答え (Zenzai など) があとで届いて表示に反映しても、一覧を出すかどうかは変えない
+        var k = new Keyboard(moreCandidates: r => r == "たんいを" ? ["単位を", "単位お", "たんいを"] : []) { CandidatesOnSecondSpace = true };
+        k.Type("tanniwotoru ");
+        k.Controller.RefreshConversion();
+        Assert.Equal(0, k.Host.View!.Candidates.Count, "1 回目の Space のあとは出さないまま");
+        k.Press(VirtualKeys.Space);
+        var chosen = k.Host.View!.Clauses![0];
+        Assert.True(k.Controller.RefreshConversion() is not null, "選び直した文節があるので、届いた答えを反映する");
+        Assert.True(k.Host.View!.Candidates.Count >= 2, "2 回目の Space で出した一覧は出したまま");
+        Assert.Equal(chosen, k.Host.View!.Clauses![0], "選んでいる候補は変えない");
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_ClickingTypingCandidateKeepsList()
+    {
+        // 入力中に出した候補をクリックしたら、前の変換で一覧を出したかによらず、一覧を出したままにする
+        static int ClickedListCount(bool openedBefore)
+        {
+            var k = new Keyboard { CandidatesOnSecondSpace = true, ShowCandidatesWhileTyping = true };
+            if (openedBefore)
+            {
+                k.Type("kawa ");
+                k.Press(VirtualKeys.Space);
+                k.Press(VirtualKeys.Return);
+            }
+            k.Type("tanniwotoru");
+            Assert.True(k.Host.View!.Candidates.Count >= 2, "入力中の候補が出る: " + string.Join(",", k.Host.View.Candidates));
+            k.Controller.SelectCandidate(1);
+            return k.Host.View!.Candidates.Count;
+        }
+        var fresh = ClickedListCount(openedBefore: false);
+        Assert.True(fresh >= 2, "クリックしたあとも一覧を出す");
+        Assert.Equal(fresh, ClickedListCount(openedBefore: true), "前の変換に左右されない");
     }
 
     [Test]

@@ -689,7 +689,8 @@ public sealed partial class CompositionController
                 // 候補の一覧の番号 (1〜9) で選ぶ。番号の無い候補 (一覧より後ろ) なら、普通に打った数字として扱う。
                 // かな入力では数字の段のキーは ぬふあうえおやゆよ なので、テンキーだけで選ぶ。
                 // 設定「変換中の数字キーで候補を選ぶ」が OFF なら、上の段もテンキーも普通に打った数字 (今の候補で確定して入力する: issue #989)。
-                return SelectByNumber(vk >= 0x61 ? vk - 0x61 : vk - 0x31);
+                // 候補の一覧をまだ出していなければ、見えない候補を選ばずに普通に打った数字として扱う (CandidatesOnSecondSpace)。
+                return CandidatesVisible && SelectByNumber(vk >= 0x61 ? vk - 0x61 : vk - 0x31);
             default:
                 return false;
         }

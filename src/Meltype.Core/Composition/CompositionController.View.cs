@@ -53,20 +53,22 @@ public sealed partial class CompositionController
         if (_converting && _clauses.Count > 0)
         {
             var selected = _clauses[_selectedClause];
+            // CandidatesOnSecondSpace: 一覧を出すまでは候補を取りに行かず、文節のみを見せる (macOS 標準の日本語入力と同じ)
+            var visible = CandidatesVisible;
             // 選んでいる文節は、最初から候補の一覧をすべて出す (Space を 1 回押しただけでは一部しか出ず、選び間違えやすかった)。
-            if (!selected.Expanded) Expand(selected);
+            if (visible && !selected.Expanded) Expand(selected);
             // 出している文節に Zenzai の答えがあれば、説明の頭に「Zenzai」と出す (学習・選び直しで変わった文節は数えない。issue #1152)
             var zenzai = _clauses.Any(c => c.ZenzaiText is { } z && c.Text == z);
             _out.Show(new CompositionView(
                 string.Concat(_clauses.Select(c => c.Text)),
-                selected.Candidates,
-                selected.Index,
+                visible ? selected.Candidates : [],
+                visible ? selected.Index : -1,
                 true,
                 (zenzai ? "Zenzai · " : "") + "←→ 文節　Space/↓ 候補　1〜9 選択　Shift+←→ 区切り　Enter 確定　Esc 戻る",
                 _clauses.Select(c => c.Text).ToList(),
                 _selectedClause,
-                CandidateNotes(selected),
-                _settings().ShowCandidateMeanings ? CandidateMeaning(selected) : null,
+                visible ? CandidateNotes(selected) : null,
+                visible && _settings().ShowCandidateMeanings ? CandidateMeaning(selected) : null,
                 MisspellingSuggestion(),
                 Typed: TypedKeys(),
                 Committed: string.Concat(_clauses.Select(c => c.Text)), ContextHint: zenzai ? "Zenzai" : null));

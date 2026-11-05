@@ -137,7 +137,8 @@ public static unsafe class Exports
         public Config.InputMode? InputMethod => null;
 
         public MeltypeSession CreateSession(Func<Config.Settings> settings) =>
-            Runtime.CreateSession(s_converter, settings, s_converter.Candidates, autoSpacing: s_mozc is null, directModeDetection: true);
+            Runtime.CreateSession(s_converter, settings, s_converter.Candidates, autoSpacing: s_mozc is null, directModeDetection: true,
+                candidatesOnSecondSpace: s_mozc is null);
 
         public string? ReadingOf(string text) => null;
 

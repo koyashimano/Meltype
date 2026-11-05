@@ -361,13 +361,15 @@ public sealed partial class CompositionController
     private bool RefreshOpenConversion()
     {
         if (_clausesEdited || _reconversion is not null || _clauses.Count == 0) return false;
-        var (old, selected, tabStarted) = (_clauses, _selectedClause, _tabStartedConversion);
+        var (old, selected, tabStarted, candidatesShown) = (_clauses, _selectedClause, _tabStartedConversion, _candidatesShown);
         WithoutWaiting(() =>
         {
             StartConversion(_conversionPrefersJapanese);
             return true;
         });
         _tabStartedConversion = tabStarted;
+        // 2 回目の Space で出した一覧 (CandidatesOnSecondSpace) は、答えが届いても出したまま
+        _candidatesShown = candidatesShown;
         var sameClauses = _clauses.Count == old.Count && _clauses.Zip(old).All(p => p.First.Reading == p.Second.Reading);
         var nothingNew = sameClauses && _clauses.Zip(old).All(p => p.First.Text == p.Second.Text && p.First.Candidates.All(p.Second.Candidates.Contains));
         if (nothingNew || !sameClauses && (selected != 0 || old.Any(c => c.Changed)))
@@ -420,6 +422,8 @@ public sealed partial class CompositionController
             _clauses = [new Clause(_text.AllKana(final: false), false, typing) { Raw = _text.Raw, Expanded = true }];
             _selectedClause = 0;
             _converting = true;
+            // 見えていた一覧から選んだので、一覧は出したままにする (CandidatesOnSecondSpace)
+            _candidatesShown = true;
         }
         if (!_converting || _clauses.Count == 0) return;
         var clause = _clauses[_selectedClause];
@@ -479,6 +483,7 @@ public sealed partial class CompositionController
         _clauses = [];
         _spaceStartedConversion = false;
         _tabStartedConversion = false;
+        _candidatesShown = false;
     }
 
     /// <summary>フォーカスが変わったときなど。前の入力欄の文脈を持ち越さない。</summary>
