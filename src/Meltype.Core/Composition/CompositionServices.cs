@@ -36,6 +36,12 @@ public sealed record CompositionServices
     /// </summary>
     public Func<string, IReadOnlyList<string>>? MoreCandidates { get; init; }
 
+    /// <summary>
+    /// 読みの先頭の一部のみを変換した候補 (わたしは → 私・渡し・輪) と、その読みの文字数。読みの長い順 (なければ null)。
+    /// 文節の候補の一覧で全体の候補の後ろに出し、選ぶと文節をその長さに縮めて、残りの読みを次の文節にする (macOS 標準の日本語入力と同じ)。
+    /// </summary>
+    public Func<string, IReadOnlyList<(string Text, int Length)>>? ShorterCandidates { get; init; }
+
     /// <summary>英訳の候補 (複雑な → complex)。null なら出さない。</summary>
     public TranslationDictionary? Translations { get; init; }
 

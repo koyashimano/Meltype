@@ -265,7 +265,8 @@ internal static class CompositionTests
         public Keyboard(bool live = false, bool direct = false, ConversionHistory? history = null, IKanjiConverter? converter = null,
             Func<string, IReadOnlyList<string>>? moreCandidates = null, UserDictionary? userDictionary = null, LanguageMemory? languages = null,
             TranslationDictionary? translations = null, TranslationHistory? translationHistory = null, Predictor? predictor = null,
-            Func<DateTime>? now = null, bool showTypedKeys = false, bool tabConversion = false, bool englishNamePredictions = false)
+            Func<DateTime>? now = null, bool showTypedKeys = false, bool tabConversion = false, bool englishNamePredictions = false,
+            Func<string, IReadOnlyList<(string Text, int Length)>>? shorterCandidates = null)
         {
             Direct = direct;
             Settings = new Meltype.Config.Settings
@@ -286,6 +287,7 @@ internal static class CompositionTests
                 ContextRules = Rules,
                 History = history ?? new ConversionHistory(null),
                 MoreCandidates = moreCandidates,
+                ShorterCandidates = shorterCandidates,
                 UserDictionary = userDictionary,
                 Misspellings = Misspellings,
                 Languages = languages,
@@ -1216,6 +1218,174 @@ internal static class CompositionTests
         var fresh = ClickedListCount(openedBefore: false);
         Assert.True(fresh >= 2, "クリックしたあとも一覧を出す");
         Assert.Equal(fresh, ClickedListCount(openedBefore: true), "前の変換に左右されない");
+    }
+
+    // わたしは|がくせいです の文節で、先頭の文節の候補の後ろに、読みの短い候補 (私・渡し・輪) を出す変換エンジン
+    private static Keyboard ShorterKeyboard() => new(
+        converter: new SplitConverter(new()
+        {
+            ["わたしはがくせいです"] = [new("わたしは", "私は"), new("がくせいです", "学生です")],
+        }),
+        moreCandidates: r => r == "わたしは" ? ["私は", "渡しは"] : [],
+        shorterCandidates: r => r == "わたしは" ? [("私", 3), ("渡し", 3), ("輪", 1)] : [])
+    { CandidatesOnSecondSpace = true };
+
+    private static string ClauseTexts(Keyboard k) => string.Join("|", k.Host.View!.Clauses!);
+
+    /// <summary>先頭の文節が text になるまで ↓ を押す (出てこなければ失敗)。</summary>
+    private static void DownUntilFirst(Keyboard k, string text)
+    {
+        for (var i = 0; i < 30 && k.Host.View!.Clauses![0] != text; i++) k.Press(VirtualKeys.Down);
+        Assert.Equal(text, k.Host.View!.Clauses![0], "候補に出る: " + string.Join(",", k.Host.View.Candidates));
+    }
+
+    [Test]
+    public static void ShorterCandidates_ShrinkClauseFurtherDownTheList()
+    {
+        // macOS 標準の日本語入力と同じく、候補の一覧を下に行くほど文節が短くなり、残りの読みは次の文節になる
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        Assert.Equal("私は|学生です", ClauseTexts(k));
+        k.Press(VirtualKeys.Space);
+        Assert.Equal("渡しは|学生です", ClauseTexts(k));
+        var list = k.Host.View!.Candidates.ToList();
+        Assert.True(list.IndexOf("私") > list.IndexOf("渡しは") && list.IndexOf("輪") > list.IndexOf("渡し"), "短い候補は後ろに、読みの長い順: " + string.Join(",", list));
+        DownUntilFirst(k, "私");
+        Assert.Equal("私|は|学生です", ClauseTexts(k));
+        DownUntilFirst(k, "輪");
+        Assert.Equal("輪|たしは|学生です", ClauseTexts(k), "残りの読み (たしは) が次の文節になる");
+        Assert.Equal(0, k.Host.View!.SelectedClause, "選んでいる文節は先頭のまま");
+    }
+
+    [Test]
+    public static void ShorterCandidates_BackToWholeCandidateRestoresClauses()
+    {
+        // 短い候補から上に戻ると、文節の区切りも元に戻る (先頭から戻って最後の候補に回ったときも)
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Space);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal(1, k.Host.View!.Clauses![0].Length, "先頭から戻ると最後 (いちばん短い) の候補: " + ClauseTexts(k));
+        Assert.Equal(3, k.Host.View!.Clauses!.Count);
+        DownUntilFirst(k, "私は");
+        Assert.Equal("私は|学生です", ClauseTexts(k));
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("私は学生です", k.Host.Document);
+    }
+
+    [Test]
+    public static void ShorterCandidates_CommitAndNumberSelection()
+    {
+        // 縮めたまま確定すると、残りの文節も確定する
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        k.Press(VirtualKeys.Space);
+        DownUntilFirst(k, "私");
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("私は学生です", k.Host.Document);
+
+        // 番号で短い候補を選ぶと、残りの読みの文節に進む
+        var n = ShorterKeyboard();
+        n.Type("watasihagakuseidesu ");
+        n.Press(VirtualKeys.Space);
+        var index = n.Host.View!.Candidates.ToList().IndexOf("私");
+        Assert.True(index is >= 0 and < 9, "1 ページ目にある");
+        n.Press('1' + index);
+        Assert.Equal("私|は|学生です", ClauseTexts(n));
+        Assert.Equal(1, n.Host.View!.SelectedClause, "残りの文節に進む");
+    }
+
+    [Test]
+    public static void ShorterCandidates_MovingAwayKeepsShrunkClause()
+    {
+        // 縮めてから → で次の文節に移ると、その区切りで決まる。戻っても元の長さには戻らない
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        k.Press(VirtualKeys.Space);
+        DownUntilFirst(k, "私");
+        k.Press(VirtualKeys.Right);
+        Assert.Equal("私|は|学生です", ClauseTexts(k));
+        k.Press(VirtualKeys.Left);
+        k.Press(VirtualKeys.Down);
+        Assert.Equal(3, k.Host.View!.Clauses!.Count, "戻ったあとは今の読み (わたし) の候補のみ: " + ClauseTexts(k));
+        Assert.Equal("は", k.Host.View!.Clauses![1]);
+    }
+
+    [Test]
+    public static void ShorterCandidates_LeftOnFirstClauseKeepsWholeCandidates()
+    {
+        // 先頭の文節で ← を押しても文節は移らないので、縮めた長さで決めずに全体の候補 (私は) に戻れる
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        k.Press(VirtualKeys.Space);
+        DownUntilFirst(k, "私");
+        k.Press(VirtualKeys.Left);
+        DownUntilFirst(k, "私は");
+        Assert.Equal("私は|学生です", ClauseTexts(k));
+    }
+
+    [Test]
+    public static void ShorterCandidates_ResizeAfterShrinkKeepsKana()
+    {
+        // 縮めてから Shift+→ で区切りを動かしても、かなを落とさない (わたし + は → わたしは)
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        k.Press(VirtualKeys.Space);
+        DownUntilFirst(k, "私");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Right);
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.Equal(2, k.Host.View!.Clauses!.Count, "残りの文節 (は) は先頭の文節に戻る: " + ClauseTexts(k));
+        Assert.Equal("学生です", k.Host.View!.Clauses![1]);
+        k.Press(VirtualKeys.F6);
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("わたしはがくせいです", k.Host.Document);
+    }
+
+    [Test]
+    public static void ShorterCandidates_StillShrinkAfterRefresh()
+    {
+        // 一覧を開いたあとに変換の答え (Zenzai など) が届き、表示に反映しても、短い候補を選ぶと文節を縮める
+        var k = ShorterKeyboard();
+        k.Type("watasihagakuseidesu ");
+        k.Press(VirtualKeys.Space);
+        Assert.True(k.Controller.RefreshConversion() is not null, "選び直した文節があるので、届いた答えを反映する");
+        DownUntilFirst(k, "私");
+        Assert.Equal("私|は|学生です", ClauseTexts(k));
+        k.Press(VirtualKeys.Return);
+        Assert.Equal("私は学生です", k.Host.Document);
+    }
+
+    [Test]
+    public static void ShorterCandidates_FilledAfterRefreshWhenFirstAskTimedOut()
+    {
+        // 一覧を開いたときは変換エンジンの答えが間に合わず (空)、あとで届いて反映したら、全体の候補も短い候補も出る
+        var asked = 0;
+        var k = new Keyboard(
+            converter: new SplitConverter(new() { ["わたしはがくせいです"] = [new("わたしは", "私は"), new("がくせいです", "学生です")] }),
+            moreCandidates: r => r == "わたしは" && asked++ > 0 ? ["私は", "渡しは"] : [],
+            shorterCandidates: r => r == "わたしは" && asked > 1 ? [("私", 3), ("渡し", 3), ("輪", 1)] : [])
+        { CandidatesOnSecondSpace = true };
+        k.Type("watasihagakuseidesu ");
+        k.Press(VirtualKeys.Space);
+        Assert.True(!k.Host.View!.Candidates.Contains("渡しは"), "まだ届いていない: " + string.Join(",", k.Host.View.Candidates));
+        Assert.True(k.Controller.RefreshConversion() is not null, "選び直した文節があるので、届いた答えを反映する");
+        var list = k.Host.View!.Candidates.ToList();
+        Assert.True(list.Contains("渡しは") && list.Contains("私"), "届いた候補が出る: " + string.Join(",", list));
+        DownUntilFirst(k, "私");
+        Assert.Equal("私|は|学生です", ClauseTexts(k));
+    }
+
+    [Test]
+    public static void ShorterCandidates_NotUsedWithoutProvider()
+    {
+        // ShorterCandidates がない (Windows・Linux) ときは今までどおり
+        var k = new Keyboard(converter: new SplitConverter(new() { ["わたしはがくせいです"] = [new("わたしは", "私は"), new("がくせいです", "学生です")] }),
+            moreCandidates: r => r == "わたしは" ? ["私は", "渡しは"] : []);
+        k.Type("watasihagakuseidesu ");
+        for (var i = 0; i < 5; i++) k.Press(VirtualKeys.Space);
+        Assert.Equal(2, k.Host.View!.Clauses!.Count);
     }
 
     [Test]

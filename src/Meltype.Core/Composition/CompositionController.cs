@@ -170,6 +170,18 @@ public sealed partial class CompositionController
 
         /// <summary>候補のうち英訳 (複雑な → complex) のもの。</summary>
         public HashSet<string> Translations { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>短い読みの候補 (ShorterCandidates) を追加したときの読み。追加していなければ null。</summary>
+        public string? Span { get; set; }
+
+        /// <summary>Span のときの Raw (全体の長さに戻ったときに戻す)。</summary>
+        public string? SpanRaw { get; set; }
+
+        /// <summary>短い読みの候補と、その読みの文字数 (Span の先頭から)。ここにない候補は Span 全体の候補。</summary>
+        public Dictionary<string, int> Lengths { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>短い読みの候補を選んで縮めたときに、残りの読みで作った次の文節。縮めていなければ null。</summary>
+        public Clause? Remainder { get; set; }
     }
 
     public CompositionController(CompositionDetector detector, IKanjiConverter converter, Func<Config.Settings> settings, CompositionServices? services = null)
@@ -383,7 +395,9 @@ public sealed partial class CompositionController
             foreach (var (fresh, previous) in _clauses.Zip(old))
             {
                 if (!previous.Changed) continue;
-                fresh.Candidates = Distinct([.. fresh.Candidates, .. previous.Candidates]);
+                // 短い読みの候補 (ShorterCandidates) は引き継がない。開くときの Expand が、読みの長さ付きで付け直す
+                // (引き継ぐと候補が重なり、長さを付けられない。縮めた文節は文節の数が変わるので、ここには来ない)
+                fresh.Candidates = Distinct([.. fresh.Candidates, .. previous.Candidates.Where(c => !previous.Lengths.ContainsKey(c))]);
                 fresh.Index = fresh.Candidates.IndexOf(previous.Text);
                 fresh.Changed = true;
                 fresh.Translations.UnionWith(previous.Translations);
@@ -430,6 +444,7 @@ public sealed partial class CompositionController
         if (index < 0 || index >= clause.Candidates.Count) return;
         clause.Index = index;
         clause.Changed = true;
+        ApplyCandidateLength();
         UpdateView();
     }
 

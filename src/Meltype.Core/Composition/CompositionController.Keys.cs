@@ -639,10 +639,11 @@ public sealed partial class CompositionController
                 Resize(-1);
                 return true;
             case VirtualKeys.Right:
-                _selectedClause = Math.Min(_selectedClause + 1, _clauses.Count - 1);
+                // 縮めた文節から移るときは、その長さで決める (移らないときは決めない)
+                if (_selectedClause + 1 < _clauses.Count) FixClauseLength(_clauses[_selectedClause++]);
                 return true;
             case VirtualKeys.Left:
-                _selectedClause = Math.Max(_selectedClause - 1, 0);
+                if (_selectedClause > 0) FixClauseLength(_clauses[_selectedClause--]);
                 return true;
             case VirtualKeys.Return when shift && _settings().PartialCommit && _selectedClause < _clauses.Count - 1:
                 CommitUpToSelectedClause();
@@ -669,6 +670,7 @@ public sealed partial class CompositionController
                 // 設定「変換中の Esc は選んだ文節だけをかなに戻す」: 選んでいる文節だけをひらがなにして、変換は続ける (issue #670)
                 {
                     var clause = _clauses[_selectedClause];
+                    FixClauseLength(clause);
                     var index = clause.Candidates.IndexOf(clause.Reading);
                     if (index < 0)
                     {
@@ -708,6 +710,9 @@ public sealed partial class CompositionController
         if (index >= clause.Candidates.Count) return false;
         clause.Index = index;
         clause.Changed = true;
+        // 短い読みの候補なら文節を縮め、残りの読みの文節に進む
+        ApplyCandidateLength();
+        FixClauseLength(clause);
         if (_selectedClause + 1 < _clauses.Count) _selectedClause++;
         else Commit();
         return true;
@@ -773,6 +778,7 @@ public sealed partial class CompositionController
     private void ApplyFunctionKeyToClause(int vk)
     {
         var clause = _clauses[_selectedClause];
+        FixClauseLength(clause);
         var reading = clause.IsEnglish ? clause.Kana : clause.Reading;
         var raw = clause.IsEnglish ? clause.Reading : clause.Raw;
         var text = vk switch

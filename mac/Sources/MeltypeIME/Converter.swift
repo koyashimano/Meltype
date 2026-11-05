@@ -29,6 +29,8 @@ final class MeltypeConverter {
     private let zenzaiWorker: ZenzaiWorker?
     private var resultCache: [String: [Candidate]] = [:]
     private var cacheOrder: [String] = []
+    private var shorterCache: [String: [(text: String, length: Int)]] = [:]
+    private var shorterOrder: [String] = []
 
     /// 同梱の辞書のバンドル (Contents/Resources に入れている) の中のフォルダー。
     private static func resource(_ name: String) -> URL {
@@ -158,6 +160,36 @@ final class MeltypeConverter {
             return [(hiragana, best.text)]
         }
         return clauses
+    }
+
+    /// 読みの先頭の一部のみを変換した候補 (わたしは → 私・わたし・渡し・輪 …) と、その読みの長さ (UTF-16 の単位。C# の文字列と同じ)。
+    /// 読みの長い順に 30 個まで。azooKey は文全体の候補の後ろに、先頭の文節の候補と先頭から始まる語の候補を返すので、それを読みの長さで並べ直す。
+    /// Zenzai は使わない (短い語の候補は辞書で決まるので結果が変わらず、待たせないため)。
+    func shorterCandidates(for hiragana: String) -> [(text: String, length: Int)] {
+        if let cached = shorterCache[hiragana] { return cached }
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(hiragana, inputStyle: .direct)
+        var seen = Set<String>()
+        var list: [(text: String, length: Int, order: Int)] = []
+        for (order, candidate) in converter.requestCandidates(composing, options: options).mainResults.enumerated() {
+            let ruby = candidate.data.map(\.ruby).joined()
+            let reading = ruby.applyingTransform(.hiraganaToKatakana, reverse: true) ?? ruby
+            // 読みの先頭と一致するもののみ (打ち間違いを直した候補などは読みがずれるので出さない)
+            let length = reading.utf16.count
+            guard length > 0, length < hiragana.utf16.count, hiragana.utf16.starts(with: reading.utf16),
+                  seen.insert(candidate.text).inserted else { continue }
+            list.append((candidate.text, length, order))
+        }
+        let sorted = list.sorted { $0.length != $1.length ? $0.length > $1.length : $0.order < $1.order }
+            .prefix(30).map { (text: $0.text, length: $0.length) }
+        if hiragana.count <= 256 {
+            if shorterOrder.count >= 64 {
+                shorterCache.removeValue(forKey: shorterOrder.removeFirst())
+            }
+            shorterCache[hiragana] = sorted
+            shorterOrder.append(hiragana)
+        }
+        return sorted
     }
 
     /// 読みに対する候補の一覧 (重複なし、30 個まで)。

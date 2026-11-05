@@ -138,7 +138,7 @@ public static unsafe class Exports
 
         public MeltypeSession CreateSession(Func<Config.Settings> settings) =>
             Runtime.CreateSession(s_converter, settings, s_converter.Candidates, autoSpacing: s_mozc is null, directModeDetection: true,
-                candidatesOnSecondSpace: s_mozc is null);
+                candidatesOnSecondSpace: s_mozc is null, shorterCandidates: s_mozc is null ? ShorterCandidates : null);
 
         public string? ReadingOf(string text) => null;
 
@@ -197,12 +197,44 @@ public static unsafe class Exports
     [UnmanagedCallersOnly(EntryPoint = "meltype_free")]
     public static void Free(byte* text) => NativeMemory.Free(text);
 
+    /// <summary>読み → MoreCandidates で受け取った、読みの先頭の一部のみの候補。ワーカーが書き、入力のスレッドが読むので、lock して使う。</summary>
+    private static readonly Dictionary<string, IReadOnlyList<(string Text, int Length)>> s_shorter = [];
+
+    /// <summary>
+    /// Swift の候補の一覧を、読み全体の候補と、読みの先頭の一部のみを変換した候補 (「候補 タブ 読みの長さ」の行) に分ける。
+    /// 読み全体の候補を返し、短い候補は ShorterCandidates のために控える。BackgroundCallbackConverter のワーカーから呼ばれる。
+    /// </summary>
     private static string[] MoreCandidates(string reading)
     {
         if (s_candidates == null) return [];
         var text = TakeUtf8(s_candidates(ToUtf8(reading, out var buffer)));
         NativeMemory.Free(buffer);
-        return text is null ? [] : text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var whole = new List<string>();
+        var shorter = new List<(string Text, int Length)>();
+        foreach (var line in text?.Split('\n', StringSplitOptions.RemoveEmptyEntries) ?? [])
+        {
+            if (line.Split('\t') is [var candidate, var count])
+            {
+                if (int.TryParse(count, NumberStyles.None, CultureInfo.InvariantCulture, out var length))
+                    shorter.Add((candidate, length));
+            }
+            else whole.Add(line);
+        }
+        lock (s_shorter)
+        {
+            if (s_shorter.Count >= 256) s_shorter.Clear();
+            s_shorter[reading] = shorter;
+        }
+        return [.. whole];
+    }
+
+    /// <summary>
+    /// MoreCandidates が控えた短い候補を返す。入力のスレッドから呼ばれるので、Swift は呼ばない (変換エンジンはワーカーのみが呼ぶ)。
+    /// 候補の一覧 (MoreCandidates) を先に頼むので、控えがないのは、その答えも間に合わなかったときのみ。
+    /// </summary>
+    private static IReadOnlyList<(string Text, int Length)> ShorterCandidates(string reading)
+    {
+        lock (s_shorter) return s_shorter.TryGetValue(reading, out var shorter) ? shorter : [];
     }
 
     private sealed class CallbackConverter : IKanjiConverter
