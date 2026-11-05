@@ -189,10 +189,11 @@ public sealed class MeltypeSession
     /// 既定の辞書・学習データ (保存場所は <see cref="AppPaths"/>) で作る。converter は OS 側の変換エンジン、
     /// moreCandidates は読みに対する候補の一覧 (無ければ null)、wordChecker は OS のスペルチェッカー (無ければ null)。
     /// </summary>
-    public static MeltypeSession CreateDefault(IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker, bool autoSpacing = false)
+    public static MeltypeSession CreateDefault(IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker, bool autoSpacing = false,
+        bool candidatesOnSecondSpace = false)
     {
         AppPaths.MigrateFromOldName();
-        return CreateDefault(AppPaths.DataDirectory, converter, moreCandidates, wordChecker, autoSpacing);
+        return CreateDefault(AppPaths.DataDirectory, converter, moreCandidates, wordChecker, autoSpacing, candidatesOnSecondSpace);
     }
 
     // 辞書・検出器・学習データは、入力欄 (セッション) がいくつあってもプロセスで 1 つだけ作って共有する (Windows 版の CompositionService.CreateSession と同じ)。
@@ -204,7 +205,8 @@ public sealed class MeltypeSession
     private static readonly GitHubIssueTitles s_githubTitles = new();
 
     /// <summary>dataDirectory に置いた設定・辞書・学習データで作る (テストでは一時フォルダーを渡す)。</summary>
-    internal static MeltypeSession CreateDefault(string dataDirectory, IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker, bool autoSpacing = false)
+    internal static MeltypeSession CreateDefault(string dataDirectory, IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker, bool autoSpacing = false,
+        bool candidatesOnSecondSpace = false)
     {
         Directory.CreateDirectory(dataDirectory);
         var userDirectory = Path.Combine(dataDirectory, "dictionaries");
@@ -288,6 +290,7 @@ public sealed class MeltypeSession
             GitHubTitles = () => s_githubTitles,
             ClipboardCandidates = () => settings().ClipboardCandidates,
             AutomaticEnglishSpacing = () => autoSpacing,
+            CandidatesOnSecondSpace = () => candidatesOnSecondSpace,
             Punctuation = () => settings().Punctuation,
         };
         return new MeltypeSession(detector, converter, options, settings);

@@ -260,6 +260,7 @@ public sealed record CompositionOptions
     public Func<bool> LaughterAfterKana { get; init; } = () => false;
     public Func<bool> ContextualLearning { get; init; } = () => false;
     public Func<bool> ShowCandidatesWhileTyping { get; init; } = () => false;
+
     public Func<bool> GitHubIssueCandidates { get; init; } = () => false;
     public Func<string> GitHubRepository { get; init; } = () => "";
     public Func<GitHubIssueTitles?> GitHubTitles { get; init; } = () => null;
@@ -277,6 +278,12 @@ public sealed record CompositionOptions
     /// <summary>この PC のタイムゾーン (時計の候補にタイムゾーンの名前を付けるかの判定に使う。テストでは差し替える)。</summary>
     public Func<TimeZoneInfo> LocalTimeZone { get; init; } = () => TimeZoneInfo.Local;
     public Func<bool> AutomaticEnglishSpacing { get; init; } = () => false;
+
+    /// <summary>
+    /// macOS 標準の日本語入力と同じく、変換を始めた Space (1 回目) では文全体を文節に区切って変換し、候補の一覧は出さないか。
+    /// 2 回目の Space (↓・↑・Shift+Space・PageDown なども) で、選んでいる文節を次の候補にして一覧を出す。一覧を出すまでは数字キーで候補を選ばない。
+    /// </summary>
+    public Func<bool> CandidatesOnSecondSpace { get; init; } = () => false;
 
     /// <summary>句読点の組み合わせ (設定)。</summary>
     public Func<Config.PunctuationStyle> Punctuation { get; init; } = () => Config.PunctuationStyle.Japanese;
@@ -511,6 +518,8 @@ public sealed class CompositionController
             _clauses = [new Clause(_text.AllKana(final: false), false, typing) { Raw = _text.Raw, Expanded = true }];
             _selectedClause = 0;
             _converting = true;
+            // 見えていた一覧から選んだので、一覧は出したままにする (CandidatesOnSecondSpace)
+            _candidatesShown = true;
         }
         if (!_converting || _clauses.Count == 0) return;
         var clause = _clauses[_selectedClause];
@@ -618,6 +627,7 @@ public sealed class CompositionController
         _clauses = [];
         _spaceStartedConversion = false;
         _tabStartedConversion = false;
+        _candidatesShown = false;
     }
 
     /// <summary>フォーカスが変わったときなど。前の入力欄の文脈を持ち越さない。</summary>
@@ -1541,7 +1551,8 @@ public sealed class CompositionController
                 // 候補の一覧の番号 (1〜9) で選ぶ。番号の無い候補 (一覧より後ろ) なら、普通に打った数字として扱う。
                 // かな入力では数字の段のキーは ぬふあうえおやゆよ なので、テンキーだけで選ぶ。
                 // 設定「変換中の数字キーで候補を選ぶ」が OFF なら、上の段の数字は普通に打った数字 (今の候補で確定して入力する: issue #989)。
-                return SelectByNumber(vk >= 0x61 ? vk - 0x61 : vk - 0x31);
+                // 候補の一覧をまだ出していなければ、見えない候補を選ばずに普通に打った数字として扱う (CandidatesOnSecondSpace)。
+                return CandidatesVisible && SelectByNumber(vk >= 0x61 ? vk - 0x61 : vk - 0x31);
             default:
                 return false;
         }
@@ -1710,6 +1721,7 @@ public sealed class CompositionController
     private void StartConversion(bool preferJapanese = false)
     {
         _tabStartedConversion = false;
+        _candidatesShown = false;
         // 括弧単独は生成した候補だけで完結させる仕様 (issue #870)。辞書・履歴・エンジンの候補で補わない。
         // Expanded=true は追加漏れではなく、表示時の Expand も呼ばないための指定。ペアの終端までを1文節にする。
         if (BracketInput() is { } input && BracketCandidates.For(input) is { } brackets)
@@ -2674,6 +2686,12 @@ public sealed class CompositionController
     {
         var clause = _clauses[_selectedClause];
         if (!clause.IsEnglish && !clause.Expanded) Expand(clause);
+        // 一覧を出す前は、Space・↓ と同じく一覧を出して次 (前) の候補にする (見ていないページに飛ばない)
+        if (!CandidatesVisible)
+        {
+            NextCandidate(step);
+            return;
+        }
         var pages = (clause.Candidates.Count + CandidatePageSize - 1) / CandidatePageSize;
         if (pages <= 1) return;
         var page = (Math.Max(0, clause.Index) / CandidatePageSize + step + pages) % pages;
@@ -2685,6 +2703,7 @@ public sealed class CompositionController
     {
         var clause = _clauses[_selectedClause];
         if (!clause.Expanded) Expand(clause);
+        _candidatesShown = true;
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
     }
@@ -3056,6 +3075,12 @@ public sealed class CompositionController
     /// <summary>今の変換を Tab で始めたか (変換中の Tab で候補を送るため。issue #219)。</summary>
     private bool _tabStartedConversion;
 
+    // 今の変換で候補の一覧を出したか (CandidatesOnSecondSpace のとき、変換を始めたときは出さない)
+    private bool _candidatesShown;
+
+    /// <summary>今の変換で、候補の一覧を見せるか。</summary>
+    private bool CandidatesVisible => _candidatesShown || !_options.CandidatesOnSecondSpace();
+
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public void ForgetLastCommit() => _correctable.Clear();
 
@@ -3322,20 +3347,22 @@ public sealed class CompositionController
         if (_converting && _clauses.Count > 0)
         {
             var selected = _clauses[_selectedClause];
+            // CandidatesOnSecondSpace: 一覧を出すまでは候補を取りに行かず、文節のみを見せる (macOS 標準の日本語入力と同じ)
+            var visible = CandidatesVisible;
             // 選んでいる文節は、最初から候補の一覧をすべて出す (Space を 1 回押しただけでは一部しか出ず、選び間違えやすかった)。
-            if (!selected.Expanded) Expand(selected);
+            if (visible && !selected.Expanded) Expand(selected);
             // 出している文節に Zenzai の答えがあれば、説明の頭に「Zenzai」と出す (学習・選び直しで変わった文節は数えない。issue #1152)
             var zenzai = _clauses.Any(c => c.ZenzaiText is { } z && c.Text == z);
             _host.Show(new CompositionView(
                 string.Concat(_clauses.Select(c => c.Text)),
-                selected.Candidates,
-                selected.Index,
+                visible ? selected.Candidates : [],
+                visible ? selected.Index : -1,
                 true,
                 (zenzai ? "Zenzai · " : "") + "←→ 文節　Space/↓ 候補　1〜9 選択　Shift+←→ 区切り　Enter 確定　Esc 戻る",
                 _clauses.Select(c => c.Text).ToList(),
                 _selectedClause,
-                CandidateNotes(selected),
-                _options.CandidateMeanings() ? CandidateMeaning(selected) : null,
+                visible ? CandidateNotes(selected) : null,
+                visible && _options.CandidateMeanings() ? CandidateMeaning(selected) : null,
                 MisspellingSuggestion(),
                 Typed: TypedKeys(),
                 Committed: string.Concat(_clauses.Select(c => c.Text)), ContextHint: zenzai ? "Zenzai" : null));
