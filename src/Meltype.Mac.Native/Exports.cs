@@ -29,6 +29,9 @@ public static unsafe class Exports
     /// <summary>小文字の英単語 → 英語として正しい綴りなら 1。</summary>
     private static delegate* unmanaged<byte*, int> s_isWord;
 
+    /// <summary>直前に MoreCandidates で受け取った、読みの先頭の一部のみの候補 (続く ShorterCandidates で 1 回のみ使う)。</summary>
+    private static (string Reading, IReadOnlyList<(string Text, int Length)> Shorter)? s_lastShorter;
+
     /// <summary>Swift 側の関数を登録する (最初に 1 回)。</summary>
     [UnmanagedCallersOnly(EntryPoint = "meltype_init")]
     public static int Init(delegate* unmanaged<byte*, byte*, byte*> clauses, delegate* unmanaged<byte*, byte*> candidates, delegate* unmanaged<byte*, int> isWord)
@@ -75,7 +78,7 @@ public static unsafe class Exports
             var session = s_mozc is { } mozc
                 ? MeltypeSession.CreateDefault(mozc, mozc.Candidates, s_isWord == null ? null : new CallbackWordChecker())
                 : MeltypeSession.CreateDefault(new CallbackConverter(), MoreCandidates, s_isWord == null ? null : new CallbackWordChecker(), autoSpacing: true,
-                    candidatesOnSecondSpace: true);
+                    candidatesOnSecondSpace: true, shorterCandidates: ShorterCandidates);
             return GCHandle.ToIntPtr(GCHandle.Alloc(session));
         }
         catch (Exception ex)
@@ -340,10 +343,37 @@ public static unsafe class Exports
 
     private static IReadOnlyList<string> MoreCandidates(string reading)
     {
-        if (s_candidates == null) return [];
+        var (whole, shorter) = FetchCandidates(reading);
+        s_lastShorter = (reading, shorter);
+        return whole;
+    }
+
+    /// <summary>直前の MoreCandidates と同じ読みなら、そのときに受け取った分を使う (Swift に 2 回頼まない)。</summary>
+    private static IReadOnlyList<(string Text, int Length)> ShorterCandidates(string reading)
+    {
+        var last = s_lastShorter;
+        s_lastShorter = null;
+        return last is { } kept && kept.Reading == reading ? kept.Shorter : FetchCandidates(reading).Shorter;
+    }
+
+    /// <summary>Swift の候補の一覧を、読み全体の候補と、読みの先頭の一部のみを変換した候補 (「候補 タブ 読みの長さ」の行) に分ける。</summary>
+    private static (IReadOnlyList<string> Whole, IReadOnlyList<(string Text, int Length)> Shorter) FetchCandidates(string reading)
+    {
+        if (s_candidates == null) return ([], []);
         var text = TakeUtf8(s_candidates(ToUtf8(reading, out var buffer)));
         NativeMemory.Free(buffer);
-        return text is null ? [] : text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var whole = new List<string>();
+        var shorter = new List<(string Text, int Length)>();
+        foreach (var line in text?.Split('\n', StringSplitOptions.RemoveEmptyEntries) ?? [])
+        {
+            if (line.Split('\t') is [var candidate, var count])
+            {
+                if (int.TryParse(count, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var length))
+                    shorter.Add((candidate, length));
+            }
+            else whole.Add(line);
+        }
+        return (whole, shorter);
     }
 
     private sealed class CallbackConverter : IKanjiConverter

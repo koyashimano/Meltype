@@ -33,11 +33,13 @@ private let clausesCallback: ClausesCallback = { hiragana, context in
     return strdup(clauses.map { "\($0.reading)\t\($0.text)" }.joined(separator: "\n"))
 }
 
-/// 読み → 候補を改行でつないだもの。
+/// 読み → 候補を改行でつないだもの。読み全体の候補の後ろに、読みの先頭の一部のみを変換した候補を「候補 タブ 読みの長さ (UTF-16)」で続ける。
 private let candidatesCallback: CandidatesCallback = { reading in
     guard let reading else { return nil }
-    let candidates = MeltypeConverter.shared.candidates(for: String(cString: reading))
-    return strdup(candidates.joined(separator: "\n"))
+    let hiragana = String(cString: reading)
+    let candidates = MeltypeConverter.shared.candidates(for: hiragana)
+    let shorter = MeltypeConverter.shared.shorterCandidates(for: hiragana).map { "\($0.text)\t\($0.length)" }
+    return strdup((candidates + shorter).joined(separator: "\n"))
 }
 
 /// 英単語として正しい綴りか (macOS のスペルチェッカー、英語で調べる)。

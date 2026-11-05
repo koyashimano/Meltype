@@ -190,10 +190,10 @@ public sealed class MeltypeSession
     /// moreCandidates は読みに対する候補の一覧 (無ければ null)、wordChecker は OS のスペルチェッカー (無ければ null)。
     /// </summary>
     public static MeltypeSession CreateDefault(IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker, bool autoSpacing = false,
-        bool candidatesOnSecondSpace = false)
+        bool candidatesOnSecondSpace = false, Func<string, IReadOnlyList<(string Text, int Length)>>? shorterCandidates = null)
     {
         AppPaths.MigrateFromOldName();
-        return CreateDefault(AppPaths.DataDirectory, converter, moreCandidates, wordChecker, autoSpacing, candidatesOnSecondSpace);
+        return CreateDefault(AppPaths.DataDirectory, converter, moreCandidates, wordChecker, autoSpacing, candidatesOnSecondSpace, shorterCandidates);
     }
 
     // 辞書・検出器・学習データは、入力欄 (セッション) がいくつあってもプロセスで 1 つだけ作って共有する (Windows 版の CompositionService.CreateSession と同じ)。
@@ -206,7 +206,7 @@ public sealed class MeltypeSession
 
     /// <summary>dataDirectory に置いた設定・辞書・学習データで作る (テストでは一時フォルダーを渡す)。</summary>
     internal static MeltypeSession CreateDefault(string dataDirectory, IKanjiConverter converter, Func<string, IReadOnlyList<string>>? moreCandidates, IWordChecker? wordChecker, bool autoSpacing = false,
-        bool candidatesOnSecondSpace = false)
+        bool candidatesOnSecondSpace = false, Func<string, IReadOnlyList<(string Text, int Length)>>? shorterCandidates = null)
     {
         Directory.CreateDirectory(dataDirectory);
         var userDirectory = Path.Combine(dataDirectory, "dictionaries");
@@ -255,6 +255,7 @@ public sealed class MeltypeSession
             // dictionaries/ に置いた macOS の「ユーザ辞書」の .plist も読む (#40)
             UserDictionary = new UserDictionary(Path.Combine(dataDirectory, "userdict.txt"), importDirectory: userDirectory),
             MoreCandidates = moreCandidates,
+            ShorterCandidates = shorterCandidates,
             TranslationCandidates = () => settings().TranslationCandidates,
             TabConversion = () => settings().TabConversion,
             ContinueAfterConversion = () => settings().ContinueAfterConversion,

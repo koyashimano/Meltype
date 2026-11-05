@@ -162,6 +162,12 @@ public sealed record CompositionOptions
     /// </summary>
     public Func<string, IReadOnlyList<string>>? MoreCandidates { get; init; }
 
+    /// <summary>
+    /// 読みの先頭の一部のみを変換した候補 (わたしは → 私・渡し・輪) と、その読みの文字数。読みの長い順 (なければ null)。
+    /// 文節の候補の一覧で全体の候補の後ろに出し、選ぶと文節をその長さに縮めて、残りの読みを次の文節にする (macOS 標準の日本語入力と同じ)。
+    /// </summary>
+    public Func<string, IReadOnlyList<(string Text, int Length)>>? ShorterCandidates { get; init; }
+
     /// <summary>英訳の候補 (複雑な → complex)。null なら出さない。</summary>
     public TranslationDictionary? Translations { get; init; }
 
@@ -429,6 +435,18 @@ public sealed class CompositionController
 
         /// <summary>候補のうち英訳 (複雑な → complex) のもの。</summary>
         public HashSet<string> Translations { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>短い読みの候補 (ShorterCandidates) を加えたときの読み。加えていなければ null。</summary>
+        public string? Span { get; set; }
+
+        /// <summary>Span のときの Raw (全体の長さに戻ったときに戻す)。</summary>
+        public string? SpanRaw { get; set; }
+
+        /// <summary>短い読みの候補と、その読みの文字数 (Span の先頭から)。ここにない候補は Span 全体の候補。</summary>
+        public Dictionary<string, int> Lengths { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>短い読みの候補を選んで縮めたときに、残りの読みで作った次の文節。縮めていなければ null。</summary>
+        public Clause? Remainder { get; set; }
     }
 
     public CompositionController(CaptureGate gate, CompositionDetector detector, IKanjiConverter converter, ICompositionHost host, CompositionOptions? options = null)
@@ -526,6 +544,7 @@ public sealed class CompositionController
         if (index < 0 || index >= clause.Candidates.Count) return;
         clause.Index = index;
         clause.Changed = true;
+        ApplyCandidateLength();
         UpdateView();
     }
 
@@ -1501,10 +1520,11 @@ public sealed class CompositionController
                 Resize(-1);
                 return true;
             case VirtualKeys.Right:
-                _selectedClause = Math.Min(_selectedClause + 1, _clauses.Count - 1);
+                // 縮めた文節から移るときは、その長さで決める (移らないときは決めない)
+                if (_selectedClause + 1 < _clauses.Count) FixClauseLength(_clauses[_selectedClause++]);
                 return true;
             case VirtualKeys.Left:
-                _selectedClause = Math.Max(_selectedClause - 1, 0);
+                if (_selectedClause > 0) FixClauseLength(_clauses[_selectedClause--]);
                 return true;
             case VirtualKeys.Return when shift && _options.PartialCommit() && _selectedClause < _clauses.Count - 1:
                 CommitUpToSelectedClause();
@@ -1531,6 +1551,7 @@ public sealed class CompositionController
                 // 設定「変換中の Esc は選んだ文節だけをかなに戻す」: 選んでいる文節だけをひらがなにして、変換は続ける (issue #670)
                 {
                     var clause = _clauses[_selectedClause];
+                    FixClauseLength(clause);
                     var index = clause.Candidates.IndexOf(clause.Reading);
                     if (index < 0)
                     {
@@ -1570,6 +1591,9 @@ public sealed class CompositionController
         if (index >= clause.Candidates.Count) return false;
         clause.Index = index;
         clause.Changed = true;
+        // 短い読みの候補なら文節を縮め、残りの読みの文節に進む
+        ApplyCandidateLength();
+        FixClauseLength(clause);
         if (_selectedClause + 1 < _clauses.Count) _selectedClause++;
         else Commit();
         return true;
@@ -1635,6 +1659,7 @@ public sealed class CompositionController
     private void ApplyFunctionKeyToClause(int vk)
     {
         var clause = _clauses[_selectedClause];
+        FixClauseLength(clause);
         var reading = clause.IsEnglish ? clause.Kana : clause.Reading;
         var raw = clause.IsEnglish ? clause.Reading : clause.Raw;
         var text = vk switch
@@ -2697,6 +2722,7 @@ public sealed class CompositionController
         var page = (Math.Max(0, clause.Index) / CandidatePageSize + step + pages) % pages;
         clause.Index = page * CandidatePageSize;
         clause.Changed = true;
+        ApplyCandidateLength();
     }
 
     private void NextCandidate(int step)
@@ -2706,6 +2732,7 @@ public sealed class CompositionController
         _candidatesShown = true;
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
+        ApplyCandidateLength();
     }
 
     /// <summary>
@@ -2727,8 +2754,70 @@ public sealed class CompositionController
         {
             if (!merged.Contains(candidate)) merged.Add(candidate);
         }
+        // 読みの先頭の一部のみを変換した候補を、読みの長い順に最後に足す (下に行くほど文節が短くなる)
+        if (!clause.IsEnglish && clause.Brackets is null && _options.ShorterCandidates is { } shorter && clause.Reading.Length >= 2)
+        {
+            clause.Span = clause.Reading;
+            clause.SpanRaw = clause.Raw;
+            clause.Lengths.Clear();
+            foreach (var (text, length) in shorter(clause.Reading))
+            {
+                if (length <= 0 || length >= clause.Reading.Length) continue;
+                var normalized = NormalizeHalfWidth(text, clause.Reading[..length]);
+                if (merged.Contains(normalized)) continue;
+                merged.Add(normalized);
+                clause.Lengths[normalized] = length;
+            }
+        }
         clause.Candidates = merged;
         clause.Index = Math.Max(0, merged.IndexOf(current));
+    }
+
+    /// <summary>
+    /// 選んだ候補の読みの長さに、文節を合わせる。短い読みの候補なら文節を縮め、残りの読みを次の文節にして変換する。
+    /// 全体の候補に戻ったら、残りの文節を消して元の長さに戻す。
+    /// </summary>
+    private void ApplyCandidateLength()
+    {
+        var clause = _clauses[_selectedClause];
+        if (clause.Span is not { } span) return;
+        var length = clause.Lengths.TryGetValue(clause.Text, out var found) ? found : span.Length;
+        if (length == clause.Reading.Length) return;
+        if (clause.Remainder is { } previous)
+        {
+            _clauses.Remove(previous);
+            clause.Remainder = null;
+        }
+        clause.Reading = span[..length];
+        if (length < span.Length)
+        {
+            // 候補を順に見ているだけなので、残りの読みは Zenzai を待たずに変換する
+            var rest = new Clause(span[length..], false, []);
+            Reconvert(rest, quick: true);
+            _clauses.Insert(_selectedClause + 1, rest);
+            clause.Remainder = rest;
+        }
+        // 全体の長さに戻ったら、縮める前の Raw に戻す (英語の文節に Kana がなく RestoreRaw が取り直せないときのため)
+        clause.Raw = length == span.Length ? clause.SpanRaw : null;
+        RestoreRaw();
+    }
+
+    /// <summary>
+    /// 縮めた文節から別の文節に移る (区切りを動かす) とき: 縮めた長さで決める。候補は今の読みのもののみを残し、
+    /// 次にこの文節を選んだときに、今の読みで候補を取り直す。
+    /// </summary>
+    private void FixClauseLength(Clause clause)
+    {
+        clause.Remainder = null;
+        if (clause.Span is not { } span || clause.Reading.Length == span.Length) return;
+        var text = clause.Text;
+        clause.Candidates = clause.Candidates.Where(c => (clause.Lengths.TryGetValue(c, out var length) ? length : span.Length) == clause.Reading.Length).ToList();
+        if (!clause.Candidates.Contains(text)) clause.Candidates.Insert(0, text);
+        clause.Index = clause.Candidates.IndexOf(text);
+        clause.Span = null;
+        clause.Lengths.Clear();
+        clause.Translations.Clear();
+        clause.Expanded = false;
     }
 
     /// <summary>
@@ -2760,6 +2849,7 @@ public sealed class CompositionController
         var current = _clauses[_selectedClause];
         // 空のペアは左右を一度に選択・確定する単位。区切り操作で片側の文節へ戻さない。
         if (current.Brackets is not null) return;
+        FixClauseLength(current);
         var next = _selectedClause + 1 < _clauses.Count ? _clauses[_selectedClause + 1] : null;
         // 区切りを動かせないときは、英語の文節を読み直さずにそのままにする
         if (current.IsEnglish && !CanReadAsJapanese(current)) return;
@@ -2831,15 +2921,19 @@ public sealed class CompositionController
 
     private static bool CanReadAsJapanese(Clause clause) => clause is { IsEnglish: true, Kana: { } kana } && kana.Any(IsKana);
 
-    private void Reconvert(Clause clause)
+    /// <param name="quick">最初の候補を、Zenzai を使わないその読みだけの変換にする (待たせたくないとき)。</param>
+    private void Reconvert(Clause clause, bool quick = false)
     {
-        clause.Candidates = JapaneseCandidates(clause.Reading, null);
+        clause.Candidates = JapaneseCandidates(clause.Reading, quick ? Standalone(clause.Reading) : null);
         clause.Index = 0;
         clause.Changed = false;
         // 前の読みのもの。候補の一覧は、文節を選んだときに新しい読みで取り直す
         clause.Expanded = false;
         clause.Raw = null;
         clause.Translations.Clear();
+        clause.Span = null;
+        clause.Lengths.Clear();
+        clause.Remainder = null;
         if (_options.History?.Get(clause.Reading) is { } learned) Prefer(clause, learned);
     }
 
