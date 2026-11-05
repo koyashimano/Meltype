@@ -164,6 +164,9 @@ internal sealed class CompositionState
     /// <summary>今の変換を Tab で始めたか (変換中の Tab で候補を送るため。issue #219)。</summary>
     public bool TabStartedConversion;
 
+    // 今の変換で候補の一覧を出したか (CandidatesOnSecondSpace のとき、変換を始めたときは出さない)
+    public bool CandidatesShown;
+
     // 続けて打つ前に選んでいた候補 (読み → 文字)。確定するか、変換ボックスを空にするまで。
     public readonly Dictionary<string, string> KeptChoices = [];
 }

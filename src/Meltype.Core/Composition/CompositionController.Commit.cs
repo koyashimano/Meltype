@@ -171,6 +171,9 @@ internal static partial class CompositionController
     internal sealed record CommitRecord(string Text, string Raw, bool English, bool SpaceIntended, bool AfterEnglish = false);
     private const int MaxCorrectable = 4;
 
+    /// <summary>今の変換で、候補の一覧を見せるか。</summary>
+    private static bool CandidatesVisible(CompositionState state, CompositionEnv env) => state.CandidatesShown || !env.Services.CandidatesOnSecondSpace();
+
     /// <summary>キャレットが動いたかもしれないとき (Meltype を通らなかったキー・クリック)。直前の語は確定し直さない。</summary>
     public static void ForgetLastCommit(CompositionState state)
     {

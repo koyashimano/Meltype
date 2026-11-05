@@ -89,6 +89,7 @@ internal static partial class CompositionController
         state.ConversionPrefersJapanese = preferJapanese;
         state.ClausesEdited = false;
         state.TabStartedConversion = false;
+        state.CandidatesShown = false;
         var asKana = state.Text.Mode is DisplayMode.Hiragana or DisplayMode.Katakana or DisplayMode.HalfWidthKatakana;
         var segments = asKana ? CompositionText.AllJapaneseSegments(state.Text, env) : CompositionText.ConversionSegments(state.Text, env);
         var utility = Utilities(state, env, segments);
@@ -845,6 +846,12 @@ internal static partial class CompositionController
     {
         var clause = state.Clauses[state.SelectedClause];
         if (!clause.IsEnglish && !clause.Expanded) Expand(state, env, clause);
+        // 一覧を出す前は、Space・↓ と同じく一覧を出して次 (前) の候補にする (見ていないページに飛ばない)
+        if (!CandidatesVisible(state, env))
+        {
+            NextCandidate(state, env, step);
+            return;
+        }
         var pages = (clause.Candidates.Count + CandidatePageSize - 1) / CandidatePageSize;
         if (pages <= 1) return;
         var page = (Math.Max(0, clause.Index) / CandidatePageSize + step + pages) % pages;
@@ -856,6 +863,7 @@ internal static partial class CompositionController
     {
         var clause = state.Clauses[state.SelectedClause];
         if (!clause.Expanded) Expand(state, env, clause);
+        state.CandidatesShown = true;
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
     }

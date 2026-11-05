@@ -52,20 +52,22 @@ internal static partial class CompositionController
         if (IsConverting(state) && state.Clauses.Count > 0)
         {
             var selected = state.Clauses[state.SelectedClause];
+            // CandidatesOnSecondSpace: 一覧を出すまでは候補を取りに行かず、文節のみを見せる (macOS 標準の日本語入力と同じ)
+            var visible = CandidatesVisible(state, env);
             // 選んでいる文節は、最初から候補の一覧をすべて出す (Space を 1 回押しただけでは一部しか出ず、選び間違えやすかった)。
-            if (!selected.Expanded) Expand(state, env, selected);
+            if (visible && !selected.Expanded) Expand(state, env, selected);
             // 出している文節に Zenzai の答えがあれば、説明の頭に「Zenzai」と出す (学習・選び直しで変わった文節は数えない。issue #1152)
             var zenzai = state.Clauses.Any(c => c.ZenzaiText is { } z && c.Text == z);
             CompositionOutput.Show(state.Out, env, new CompositionView(
                 string.Concat(state.Clauses.Select(c => c.Text)),
-                selected.Candidates,
-                selected.Index,
+                visible ? selected.Candidates : [],
+                visible ? selected.Index : -1,
                 true,
                 (zenzai ? "Zenzai · " : "") + "←→ 文節　Space/↓ 候補　1〜9 選択　Shift+←→ 区切り　Enter 確定　Esc 戻る",
                 state.Clauses.Select(c => c.Text).ToList(),
                 state.SelectedClause,
-                CandidateNotes(selected),
-                env.Settings.ShowCandidateMeanings ? CandidateMeaning(state, env, selected) : null,
+                visible ? CandidateNotes(selected) : null,
+                visible && env.Settings.ShowCandidateMeanings ? CandidateMeaning(state, env, selected) : null,
                 MisspellingSuggestion(state, env),
                 Typed: TypedKeys(state, env),
                 Committed: string.Concat(state.Clauses.Select(c => c.Text)), ContextHint: zenzai ? "Zenzai" : null));

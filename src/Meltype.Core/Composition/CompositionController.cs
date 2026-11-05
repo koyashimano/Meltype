@@ -286,13 +286,15 @@ internal static partial class CompositionController
     private static bool RefreshOpenConversion(CompositionState state, CompositionEnv env)
     {
         if (state.ClausesEdited || state.Reconversion is not null || state.Clauses.Count == 0 || state.Clauses is [{ Alternatives: not null, Changed: true }]) return false;
-        var (old, selected, tabStarted) = (state.Clauses, state.SelectedClause, state.TabStartedConversion);
+        var (old, selected, tabStarted, candidatesShown) = (state.Clauses, state.SelectedClause, state.TabStartedConversion, state.CandidatesShown);
         WithoutWaiting(state, env, () =>
         {
             StartConversion(state, env, state.ConversionPrefersJapanese);
             return true;
         });
         state.TabStartedConversion = tabStarted;
+        // 2 回目の Space で出した一覧 (CandidatesOnSecondSpace) は、答えが届いても出したまま
+        state.CandidatesShown = candidatesShown;
         var sameClauses = state.Clauses.Count == old.Count && state.Clauses.Zip(old).All(p => p.First.Reading == p.Second.Reading);
         var nothingNew = sameClauses && state.Clauses.Zip(old).All(p => p.First.Text == p.Second.Text && p.First.Candidates.All(p.Second.Candidates.Contains));
         if (nothingNew || !sameClauses && (selected != old.Count - 1 || old.Any(c => c.Changed)))
@@ -361,6 +363,8 @@ internal static partial class CompositionController
             if (index < 0 || index >= typing.Count) return;
             state.Clauses = [new Clause(CompositionText.AllKana(state.Text, env, final: false), false, typing) { Raw = CompositionText.Raw(state.Text), Expanded = true }];
             state.SelectedClause = 0;
+            // 見えていた一覧から選んだので、一覧は出したままにする (CandidatesOnSecondSpace)
+            state.CandidatesShown = true;
         }
         if (!IsConverting(state) || state.Clauses.Count == 0) return;
         var clause = state.Clauses[state.SelectedClause];
@@ -419,6 +423,7 @@ internal static partial class CompositionController
         state.Clauses = [];
         state.SpaceStartedConversion = false;
         state.TabStartedConversion = false;
+        state.CandidatesShown = false;
     }
 
     /// <summary>パスワード欄に移ったとき、未確定入力と前の欄の文脈を確定せずに捨てる。</summary>

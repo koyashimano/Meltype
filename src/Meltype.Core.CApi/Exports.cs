@@ -121,6 +121,15 @@ public static unsafe class Exports
         try
         {
             var parts = Runtime.SessionParts(Converter, Converter.Candidates, Converter.Reading);
+            // Mac のみ macOS 標準の日本語入力に合わせる (Linux・Android は本家のまま)
+            if (OperatingSystem.IsMacOS())
+                parts = parts with
+                {
+                    Services = parts.Services with
+                    {
+                        CandidatesOnSecondSpace = () => true,
+                    },
+                };
             return GCHandle.ToIntPtr(GCHandle.Alloc(new ImeHost(new NativeEnvironment(), parts, () => Runtime.Settings.Current)));
         }
         catch (Exception ex)
