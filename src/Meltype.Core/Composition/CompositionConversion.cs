@@ -723,6 +723,12 @@ internal static class CompositionConversion
     {
         var clause = conversion.SelectedClause;
         if (!clause.IsEnglish && !clause.Expanded) Expand(env, clause);
+        // 一覧を出す前は、Space・↓ と同じく一覧を出して次 (前) の候補にする (見ていないページに飛ばない)
+        if (!CompositionPresentation.CandidatesVisible(conversion, env))
+        {
+            NextCandidate(conversion, env, step);
+            return;
+        }
         var pages = (clause.Candidates.Count + CandidatePageSize - 1) / CandidatePageSize;
         if (pages <= 1) return;
         var page = (Math.Max(0, clause.Index) / CandidatePageSize + step + pages) % pages;
@@ -734,6 +740,7 @@ internal static class CompositionConversion
     {
         var clause = conversion.SelectedClause;
         if (!clause.Expanded) Expand(env, clause);
+        conversion.CandidatesShown = true;
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
     }

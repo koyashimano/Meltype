@@ -59,6 +59,8 @@ internal static class CompositionRefresh
             }
         }
         if (incoming is not null && sameClauses) incoming.Selected = open.Selected;
+        // 2 回目の Space で出した一覧 (CandidatesOnSecondSpace) は、答えが届いても出したまま
+        if (incoming is not null) incoming.CandidatesShown = open.CandidatesShown;
         return incoming;
     }
 }

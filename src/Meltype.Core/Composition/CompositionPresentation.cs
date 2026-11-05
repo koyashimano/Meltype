@@ -13,6 +13,8 @@ namespace Meltype.Composition;
 /// <summary>変換ボックスの表示、案内、候補の注記と予測。確定やキーの処理は呼ばない。</summary>
 internal static class CompositionPresentation
 {
+    /// <summary>今の変換で、候補の一覧を見せるか。</summary>
+    internal static bool CandidatesVisible(Conversion conversion, CompositionEnv env) => conversion.CandidatesShown || !env.Services.CandidatesOnSecondSpace();
 
     /// <summary>選んでいる候補の意味: 日本語の意味 (ウィクショナリー)、無ければ英訳 (JMdict)。</summary>
     private static string? CandidateMeaning(CompositionEnv env, Clause clause) =>
@@ -63,21 +65,23 @@ internal static class CompositionPresentation
     {
         var (input, conversion) = (scene.Input, scene.Conversion);
         var selected = conversion.SelectedClause;
+        // CandidatesOnSecondSpace: 一覧を出すまでは候補を取りに行かず、文節のみを見せる (macOS 標準の日本語入力と同じ)
+        var visible = CandidatesVisible(conversion, env);
         // 選んでいる文節は、最初から候補の一覧をすべて出す (Space を 1 回押しただけでは一部しか出ず、選び間違えやすかった)。
-        if (!selected.Expanded) CompositionConversion.Expand(env, selected);
+        if (visible && !selected.Expanded) CompositionConversion.Expand(env, selected);
         // 出している文節に Zenzai の答えがあれば、説明の頭に「Zenzai」と出す (学習・選び直しで変わった文節は数えない。issue #1152)
         var zenzai = conversion.Clauses.Any(c => c.ZenzaiText is { } z && c.Text == z);
         var clauses = conversion.Clauses.Select(c => Composed([c])).ToList();
         return new ComposedView(
             ComposedText.Concat(clauses),
-            [.. selected.Candidates.Select(c => Candidate(selected, c))],
-            selected.Index,
+            visible ? [.. selected.Candidates.Select(c => Candidate(selected, c))] : [],
+            visible ? selected.Index : -1,
             true,
             (zenzai ? "Zenzai · " : "") + "←→ 文節　Space/↓ 候補　1〜9 選択　Shift+←→ 区切り　Enter 確定　Esc 戻る",
             clauses,
             conversion.Selected,
-            CandidateNotes(selected),
-            CandidateMeaning(env, selected),
+            visible ? CandidateNotes(selected) : null,
+            visible ? CandidateMeaning(env, selected) : null,
             Suggestion(CompositionSpelling.MisspellingSuggestion(input, env)),
             Typed: TypedKeys(input, conversion, env),
             Committed: ComposedText.Concat(clauses), ContextHint: zenzai ? "Zenzai" : null, Colors: selected.Colors);

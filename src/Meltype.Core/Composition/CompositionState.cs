@@ -158,6 +158,9 @@ internal sealed class Conversion(List<Clause> clauses, ConversionTrigger started
 
     /// <summary>文節の区切りを動かした。届いた答えで作り直すと、ユーザーの操作が消える。</summary>
     public bool Edited { get; set; }
+
+    /// <summary>候補の一覧を出した (CandidatesOnSecondSpace のとき、変換を始めたときは出さない)。</summary>
+    public bool CandidatesShown { get; set; }
 }
 
 /// <summary>打ちかけの読み・英字の続きの予測の候補。Key は作ったときの打ちかけ。Index は Tab で選んでいるもの (-1 なら選んでいない)。</summary>

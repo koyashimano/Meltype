@@ -25,6 +25,12 @@ public interface IImeEnvironment
     /// 同じビルド・登録されていない・ほかの OS では null。キーを処理するスレッドで読むので、読むたびに I/O をしない。
     /// </summary>
     string? OtherTipVersion { get; }
+
+    /// <summary>
+    /// macOS 標準の日本語入力に合わせるフロントか。CApi は Core の internal な <see cref="SessionParts"/> に触れないので、ここで知らせる。
+    /// デフォルトの実装があるので、ほかのフロントとテストは何も書かなくてよい。
+    /// </summary>
+    bool FollowsMacInputMethod => false;
 }
 
 /// <summary>
@@ -45,7 +51,15 @@ public sealed class ImeHost
     internal ImeHost(IImeEnvironment environment, SessionParts parts, Func<Settings> settings, Action<ImeKey>? keyPressed = null)
     {
         _environment = environment;
-        _parts = parts;
+        _parts = environment.FollowsMacInputMethod
+            ? parts with
+            {
+                Services = parts.Services with
+                {
+                    CandidatesOnSecondSpace = () => true,
+                },
+            }
+            : parts;
         _settings = settings;
         _keyPressed = keyPressed;
     }

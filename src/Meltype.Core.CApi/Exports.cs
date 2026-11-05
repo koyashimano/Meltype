@@ -133,7 +133,9 @@ public static unsafe class Exports
     {
         try
         {
-            return GCHandle.ToIntPtr(GCHandle.Alloc(Runtime.CreateHost(new NativeEnvironment(), () => Runtime.Settings.Current, () => s_lateResults, countKeys: true)));
+            // Mac のみ macOS 標準の日本語入力に合わせる (Linux・Android は本家のまま)
+            var environment = new NativeEnvironment { FollowsMacInputMethod = OperatingSystem.IsMacOS() };
+            return GCHandle.ToIntPtr(GCHandle.Alloc(Runtime.CreateHost(environment, () => Runtime.Settings.Current, () => s_lateResults, countKeys: true)));
         }
         catch (Exception ex)
         {
@@ -174,6 +176,8 @@ public static unsafe class Exports
         public string? ClipboardText => null;
 
         public string? OtherTipVersion => null;
+
+        public bool FollowsMacInputMethod { get; init; }
     }
 
     /// <summary>データの保存場所 (設定・学習・ユーザー辞書)。meltype_free で解放する。</summary>
