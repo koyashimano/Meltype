@@ -84,6 +84,9 @@ cp -R Resources/ja.lproj Resources/en.lproj "$APP/Contents/Resources/"
 for bundle in "$BIN"/*.bundle; do
     [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
+# Swift Package のチェックアウトから来たリソースは読み取り専用になる。install-app.sh の
+# xattr -drs は、読み取り専用のファイルで Permission denied になって止まるので、書けるようにしておく。
+chmod -R u+w "$APP/Contents/Resources"
 # Zenzai のモデル zenz-v3.2-small (Apache-2.0) を同梱する (issue #1130)。版とハッシュは native/zenzai/zenzai.env (Windows と共通)。
 # 取れないとき: リリースのビルド (タグ v*) なら止める (Zenzai は既定 ON なので、無いまま配らない)。
 # 自分の Mac で使うビルドなら、同梱せずに続ける (Zenzai なしで、azooKey の辞書だけで変換する)
