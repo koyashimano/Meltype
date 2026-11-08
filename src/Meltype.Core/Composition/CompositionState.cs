@@ -78,6 +78,15 @@ internal sealed record CompositionEnv(CompositionDetector Detector, IKanjiConver
     internal CompositionEnv WithoutWaiting() => LateResults ? this with { Deadline = 0 } : this;
 
     /// <summary>
+    /// ライブ変換が答えを待ってよい時刻 (<see cref="CompositionServices.LiveConversionWaitMs"/>)。0 なら待たない。
+    /// 出来事ごとに 1 つなので、1 回の入力で区間をいくつ変換しても、待つ時間の合計は上限を超えない。
+    /// </summary>
+    public long LiveDeadline { get; init; }
+
+    /// <summary>ライブ変換の答えを <see cref="LiveDeadline"/> まで待つ。後から結果を受け取れないフロントは、今までどおり待つ。</summary>
+    internal CompositionEnv WaitingForLive() => LateResults ? this with { Deadline = LiveDeadline } : this;
+
+    /// <summary>
     /// 英数状態で打ち始めた文字がローマ字 (日本語) かを判定する。null なら英数状態では判定しない。
     /// 引数は (打った英字, もう続きが無いか)。
     /// </summary>

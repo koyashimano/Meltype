@@ -959,7 +959,7 @@ internal static class CompositionConversion
         // 辞書・学習・変換エンジンは入力の間は変わらない (控えは入力を始めるときに空にする)。打ったものに英数字があるか (KeepTypedSymbols) は入力の途中で変わる
         var key = string.Join("\u0001", kana, afterEnglish, before, EnglishInComposition(input, env), env.Context().FollowingText, TypedLetterOrDigit(input));
         if (env.LiveCache.TryGetValue(key, out var cached)) return cached;
-        var clauses = Converted(ConvertJapaneseSegment(input, env.WithoutWaiting(), kana, afterEnglish, before, zenzai: true));
+        var clauses = Converted(ConvertJapaneseSegment(input, env.WaitingForLive(), kana, afterEnglish, before, zenzai: true));
         if (env.LiveCache.Count > 256) env.LiveCache.Clear();
         env.LiveCache[key] = clauses;
         return clauses;

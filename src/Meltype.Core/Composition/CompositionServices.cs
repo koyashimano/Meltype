@@ -56,6 +56,12 @@ internal sealed record CompositionServices
     /// </summary>
     public Func<bool> CandidatesOnSecondSpace { get; init; } = () => false;
 
+    /// <summary>
+    /// ライブ変換で、変換エンジンの答えを 1 回の入力で待つ上限 (ms)。Space などで待つ時間 (InputBudgetMs) 以下にする。
+    /// 0 (デフォルト) なら待たずにかなで出し、答えが届いたら差し替える。待つと、打つたびに かな → 漢字 と切り替わってちらつかない (Mac 版)。
+    /// </summary>
+    public int LiveConversionWaitMs { get; init; }
+
     /// <summary>ユーザーが英字 / かなに直した語の学習。</summary>
     public LanguageMemory? Languages { get; init; }
 

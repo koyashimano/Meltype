@@ -643,6 +643,7 @@ internal static class ImeSession
             LateResults = lateResults,
             Deadline = lateResults ? 0 : long.MaxValue,
             LiveCache = state.Composition.LiveCache,
+            LiveDeadline = env.Parts.Services.LiveConversionWaitMs > 0 ? Environment.TickCount64 + env.Parts.Services.LiveConversionWaitMs : 0,
             Context = () => CompositionContext.ContextOf(state.Composition, composition),
         };
         return composition;

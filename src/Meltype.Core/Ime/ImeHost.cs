@@ -45,6 +45,12 @@ public sealed class ImeHost
     private readonly Func<Settings> _settings;
     private readonly Action<ImeKey>? _keyPressed;
 
+    /// <summary>
+    /// Mac 版のライブ変換で、Mozc・Zenzai の答えを待つ上限 (ms)。Space などで待つ時間 (400 ms) と同じにする。
+    /// 待たないと、打つたびに かな → 漢字 と表示が切り替わってちらつく。間に合わなければ、待たないときと同じく後から差し替える。
+    /// </summary>
+    private const int MacLiveConversionWaitMs = 400;
+
     /// <param name="parts">入力欄の本体を作る部品 (<see cref="MeltypeRuntime.SessionParts"/>)。辞書・学習データ・変換エンジンは入力欄で共有する。</param>
     /// <param name="settings">設定 (config.json)。アプリ別設定は ImeSession が ImeField.App で反映する。フロントは読まない。</param>
     /// <param name="keyPressed">受け持つ入力欄で押したキー (打鍵数)。</param>
@@ -57,6 +63,7 @@ public sealed class ImeHost
                 Services = parts.Services with
                 {
                     CandidatesOnSecondSpace = () => true,
+                    LiveConversionWaitMs = MacLiveConversionWaitMs,
                 },
             }
             : parts;
