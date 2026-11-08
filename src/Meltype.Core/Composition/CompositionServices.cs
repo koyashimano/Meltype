@@ -80,6 +80,12 @@ public sealed record CompositionServices
     /// </summary>
     public Func<bool> CandidatesOnSecondSpace { get; init; } = () => false;
 
+    /// <summary>
+    /// ライブ変換で、変換エンジン (IBackgroundConverter) の答えを待つ上限 (ms)。1 回の入力の予算 (InputBudgetMs) を超えては待たない。
+    /// 0 (既定) なら待たずにかなで出し、答えが届いたら差し替える。待つと、打つたびに かな → 漢字 と切り替わってちらつかない (Mac 版)。
+    /// </summary>
+    public int LiveConversionWaitMs { get; init; }
+
     /// <summary>ユーザーが英字 / かなに直した語の学習。</summary>
     public LanguageMemory? Languages { get; init; }
 

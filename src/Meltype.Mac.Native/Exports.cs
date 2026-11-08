@@ -80,6 +80,12 @@ public static unsafe class Exports
     private static MozcConverter? s_mozc;
 
     /// <summary>
+    /// Mac 版のライブ変換で、azooKey・Zenzai の答えを待つ上限 (ms)。1 回の入力の予算 (400 ms) と同じにする。
+    /// 待たないと、打つたびに かな → 漢字 と表示が切り替わってちらつく。間に合わなければ、待たないときと同じく後から差し替える。
+    /// </summary>
+    private const int LiveConversionWaitMs = 400;
+
+    /// <summary>
     /// 変換エンジンを入力のスレッドで待たず、結果が届いたら notify を呼ぶ。meltype_init / meltype_init_mozc の後、meltype_ime_create の前に 1 回呼ぶ。
     /// notify はワーカーのスレッドで呼ばれるので、フロントはメインループに移してから、フォーカスのある入力欄に refresh の出来事を送る。
     /// 呼ばないフロント (古いフロント・--self-test) では、結果を反映する経路が無いので、答えが出るまで待つ。
@@ -138,7 +144,8 @@ public static unsafe class Exports
 
         public MeltypeSession CreateSession(Func<Config.Settings> settings) =>
             Runtime.CreateSession(s_converter, settings, s_converter.Candidates, autoSpacing: s_mozc is null, directModeDetection: true,
-                candidatesOnSecondSpace: s_mozc is null, shorterCandidates: s_mozc is null ? ShorterCandidates : null);
+                candidatesOnSecondSpace: s_mozc is null, shorterCandidates: s_mozc is null ? ShorterCandidates : null,
+                liveConversionWaitMs: s_mozc is null ? LiveConversionWaitMs : 0);
 
         public string? ReadingOf(string text) => null;
 

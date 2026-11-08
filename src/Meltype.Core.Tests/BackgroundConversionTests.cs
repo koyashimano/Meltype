@@ -130,6 +130,24 @@ internal static class BackgroundConversionTests
     }
 
     [Test]
+    public static void Live_WaitsWithinLiveConversionWaitMs()
+    {
+        // Mac: 打つたびに かな → 漢字 と表示が切り替わってちらつかないように、ライブ変換も入力の予算の中で答えを待つ
+        static List<string?> Shown(int waitMs)
+        {
+            using var converter = Slow(delayMs: 30);
+            converter.Budget.Enable();
+            var session = new MeltypeSession(CompositionTests.Detector, converter,
+                new CompositionServices { LiveConversionWaitMs = waitMs }, () => new Settings { LiveConversion = true });
+            return SessionFacadeTests.Type(session, "nihongo").Select(r => r.View?.Text).ToList();
+        }
+        var shown = Shown(400);
+        Assert.Equal("日本語", shown[^1], "答えを待って漢字で出す");
+        Assert.True(!shown.Contains("にほんご"), "かなのままの表示を挟まない: " + string.Join(",", shown));
+        Assert.Equal("にほんご", Shown(0)[^1], "既定 (0) は本家と同じく待たない");
+    }
+
+    [Test]
     public static void Refresh_RebuildsPredictionsFromTheArrivedClauses()
     {
         // 最後の文節 (とる) の予測は、文節が届くまで出せない (Prediction_FromLastClause の非同期の経路)

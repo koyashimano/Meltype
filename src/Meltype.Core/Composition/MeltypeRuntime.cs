@@ -112,11 +112,12 @@ public sealed class MeltypeRuntime : IDisposable
     /// directModeDetection なら、英数状態で打ち始めた語がローマ字かを判定して日本語に戻す (設定「英数状態で自動判定」。今は Windows だけ)。
     /// candidatesOnSecondSpace なら、1 回目の Space では候補の一覧を出さず、2 回目から出す (<see cref="CompositionServices.CandidatesOnSecondSpace"/>)。
     /// shorterCandidates は、読みの先頭の一部のみを変換した候補 (<see cref="CompositionServices.ShorterCandidates"/>。なければ null)。
+    /// liveConversionWaitMs は、ライブ変換で変換エンジンの答えを待つ上限 (<see cref="CompositionServices.LiveConversionWaitMs"/>)。
     /// </summary>
     /// <param name="settings">入力欄のアプリの設定 (アプリ別設定を反映したもの)。null なら config.json の設定。</param>
     public MeltypeSession CreateSession(IKanjiConverter converter, Func<Settings>? settings = null, Func<string, IReadOnlyList<string>>? moreCandidates = null,
         bool autoSpacing = false, bool directModeDetection = false, bool candidatesOnSecondSpace = false,
-        Func<string, IReadOnlyList<(string Text, int Length)>>? shorterCandidates = null)
+        Func<string, IReadOnlyList<(string Text, int Length)>>? shorterCandidates = null, int liveConversionWaitMs = 0)
     {
         var current = settings ?? (() => Settings.Current);
         UserDictionary.Refresh();
@@ -128,6 +129,7 @@ public sealed class MeltypeRuntime : IDisposable
             ShorterCandidates = shorterCandidates,
             AutomaticEnglishSpacing = () => autoSpacing,
             CandidatesOnSecondSpace = () => candidatesOnSecondSpace,
+            LiveConversionWaitMs = liveConversionWaitMs,
             // Mac・Linux では判定しない。判定すると、判定中の英字があるときにかなキーで日本語に切り替わらない (#1724)
             ClassifyDirect = directModeDetection && OperatingSystem.IsWindows() ? (letters, final) => ClassifyDirect(letters, final, current()) : null,
         };
