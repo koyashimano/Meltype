@@ -1066,7 +1066,8 @@ internal static partial class CompositionController
     {
         var key = string.Join("\u0001", kana, afterEnglish, state.PrecedingText, EnglishInComposition(state, env), state.FollowingText, env.Services.History?.Version);
         if (state.LiveCache.TryGetValue(key, out var cached)) return cached;
-        var clauses = WithoutWaiting(state, env, () => ConvertJapaneseSegment(state, env, kana, afterEnglish, env.Converter).Select(c => (c.Reading, c.Text)).ToList());
+        List<(string Reading, string Text)> Convert() => ConvertJapaneseSegment(state, env, kana, afterEnglish, env.Converter).Select(c => (c.Reading, c.Text)).ToList();
+        var clauses = env.Budget is null ? Convert() : env.Budget.WithLimit(env.Services.LiveConversionWaitMs, Convert);
         if (state.LiveCache.Count > 256) state.LiveCache.Clear();
         state.LiveCache[key] = clauses;
         return clauses;
