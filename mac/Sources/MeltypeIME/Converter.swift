@@ -214,7 +214,8 @@ private final class ZenzaiWorker: @unchecked Sendable {
 
     private func zenzaiOptions(leftContext: String?) -> ConvertRequestOptions {
         var zenzai = options
-        zenzai.zenzaiMode = .on(weight: model, inferenceLimit: 10, personalizationMode: nil,
+        // 打つたびに変換するので、推論は 1 回にする (azooKey の説明でも、ふつうは 1 で足りる)。
+        zenzai.zenzaiMode = .on(weight: model, inferenceLimit: 1, personalizationMode: nil,
                                 versionDependentMode: .v3(.init(leftSideContext: leftContext, maxLeftSideContextLength: 20)))
         return zenzai
     }

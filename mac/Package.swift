@@ -13,8 +13,9 @@ let package = Package(
     platforms: [.macOS(.v13)],
     dependencies: [
         // main は API がよく変わるので、確かめたコミットに固定する (更新するときは Converter.swift も合わせて直す)。
-        // Zenzai (ニューラルかな漢字変換、llama.cpp + zenz モデル) を CPU で使う (Metal の版は macOS 27 でシェーダーの読み込みに失敗して落ちる)。モデル (gguf) が無ければこれまでどおりの変換になる。
-        .package(url: "https://github.com/azooKey/AzooKeyKanaKanjiConverter", revision: "d59a28e4c7ca049aef04f29a91eae9677a7753f2", traits: ["ZenzaiCPU"]),
+        // Zenzai (ニューラルかな漢字変換、llama.cpp + zenz モデル) を GPU (Metal) で使う。モデル (gguf) がなければこれまでどおりの変換になる。
+        // 本家は、Metal を使うと macOS 27 でシェーダーの読み込みに失敗して落ちるとして ZenzaiCPU にしているが、手元の macOS 27.0.1 では落ちていない。
+        .package(url: "https://github.com/azooKey/AzooKeyKanaKanjiConverter", revision: "d59a28e4c7ca049aef04f29a91eae9677a7753f2", traits: ["Zenzai"]),
     ],
     targets: [
         .executableTarget(
