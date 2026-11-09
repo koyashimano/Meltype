@@ -58,3 +58,5 @@ dice die dies died
 issue issues
 # へれ・へろ は 減る の活用 (readings.txt) だが、日本語で打つことはまず無い
 here hero
+# せっしおん と読める。前に日本語があると せっし (摂氏・接し) + おん に割れて 接し音 になっていた。
+session
