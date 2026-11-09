@@ -148,7 +148,12 @@ internal static class Quality
         new("英語", "dive", "dive"),                 // issue #1125
         new("英語", "dice", "dice"),                 // issue #1139
         new("英語", "die", "die"),
+        // 前に日本語があっても せっし (摂氏) + おん に割らない
+        new("混在", "konosession", "このsession"),
+        new("混在", "atarasiisessionwohiraku", "あたらしいsessionをひらく"),
         // 似た綴りの日本語は今までどおり
+        new("日本語", "sessidesu", "せっしです"),
+        new("日本語", "sessiondo", "せっしおんど"),
         new("日本語", "imeeji", "いめえじ"),
         new("日本語", "gare-ji", "がれーじ"),
         new("日本語", "midika", "みぢか"),           // issue #1179
