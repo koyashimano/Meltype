@@ -5940,6 +5940,31 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Learning_KanaWithoutChoosingKeepsLearnedConversion()
+    {
+        // 選び直さずに確定したとき、ほかの候補を選んだときは忘れない
+        var history = new ConversionHistory(null);
+        history.Remember("きょう", "京");
+        var k = new Keyboard(history: history);
+        k.Type("kyou \n");
+        Assert.Equal("京", history.Get("きょう"));
+    }
+
+    [Test]
+    public static void Learning_F6ThenCommitForgetsLearnedConversion()
+    {
+        // 変換せずに F6 でひらがなにして確定したときも忘れる (ライブ変換で 子の と出たのを直したとき)
+        var history = new ConversionHistory(null);
+        history.Remember("きょう", "京");
+        var k = new Keyboard(history: history);
+        k.Type("kyou");
+        k.Press(VirtualKeys.F6);
+        k.Type("\n");
+        Assert.Equal("きょう", k.Host.Output.Single());
+        Assert.Equal(null, history.Get("きょう"));
+    }
+
+    [Test]
     public static void Clauses_ShiftArrowResizes()
     {
         var k = new Keyboard();
