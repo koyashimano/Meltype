@@ -797,6 +797,7 @@ public sealed partial class CompositionController
             index = clause.Candidates.Count - 1;
         }
         clause.Index = index;
+        clause.KanaByKey = vk == VirtualKeys.F6 && !clause.IsEnglish;
     }
 
     /// <summary>

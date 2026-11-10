@@ -82,6 +82,12 @@ internal sealed partial class CompositionLearning(CompositionServices services, 
         }
         LearnConversion(clauses, context);
         if (services.History is not { } history) return;
+        // 覚えた変換 (この → 子の) が出たのをひらがなに選び直して確定したら、その変換を忘れる。
+        // かなのままの確定は下で覚えないので、忘れないと、何度ひらがなに直しても覚えた変換が出続ける。
+        foreach (var clause in clauses.Where(c => !c.IsEnglish && (c.Changed || c.KanaByKey) && c.Text == c.Reading))
+        {
+            history.Forget(clause.Reading);
+        }
         // 1 文字の読み (き → 記) を覚えると、関係ない変換 (き + ごうとう) まで巻き込むので 2 文字以上だけ。
         // ただし数字・記号の 1 文字 (1 → ①、( → （) は、かなの途中に巻き込まれないので覚える (issue #672)。
         foreach (var clause in clauses.Where(c => !c.IsEnglish && c.Changed && (c.Reading.Length >= 2 || c.Reading.Length == 1 && c.Reading[0] is < 'ぁ' or > 'ヿ' && !char.IsAsciiLetter(c.Reading[0]))))

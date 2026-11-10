@@ -66,7 +66,11 @@ public sealed partial class CompositionController
         }
         RecordCorrection(converting, text, suffix);
         if (converting) LearnClauses();
-        else if (Learning && !_escReverted) _learning.LearnLanguage(_text, _wordContinues);
+        else if (Learning && !_escReverted)
+        {
+            _learning.LearnLanguage(_text, _wordContinues);
+            ForgetConversionAsKana(text);
+        }
         if (!converting || _clauses.All(CompositionLearning.Learnable))
             RememberPhrase(converting ? string.Concat(_clauses.Select(c => c.IsEnglish ? "" : c.Reading)) : _text.AllKana(final: true), text, english);
         CommitText(text + suffix, english, _text.Raw, chosen, preserveText);
@@ -128,6 +132,16 @@ public sealed partial class CompositionController
     private void LearnClauses()
     {
         if (Learning) _learning.Learn(_clauses, ConversionContext());
+    }
+
+    /// <summary>
+    /// 変換せずに F6 (Control + J) でひらがなにして確定したら、その読みで覚えた変換 (この → 子の) を忘れる。
+    /// ライブ変換で覚えた変換が出たのを、ひらがなに直して確定したとき。
+    /// </summary>
+    private void ForgetConversionAsKana(string text)
+    {
+        if (_text.Mode != DisplayMode.Hiragana) return;
+        _services.History?.Forget(text);
     }
 
     /// <summary>予測変換の候補を確定する。日本語なら覚え直して、次からより前に出す。</summary>

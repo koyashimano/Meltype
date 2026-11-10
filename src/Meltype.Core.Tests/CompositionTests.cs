@@ -5444,6 +5444,69 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void Learning_ChoosingKanaForgetsLearnedConversion()
+    {
+        // この → 子の を覚えていると、ひらがなの この に選び直して確定しても、次も 子の が出ていた (かなのままの確定は覚えないので)
+        var history = new ConversionHistory(null);
+        history.Remember("きょう", "京");
+        var k = new Keyboard(history: history);
+        k.Type("kyou ");
+        Assert.Equal("京", k.Showing, "覚えた変換が最初に出る");
+        for (var i = 0; i < 30 && k.Showing != "きょう"; i++) k.Press(VirtualKeys.Space);
+        Assert.Equal("きょう", k.Showing, "ひらがなの候補まで進める");
+        k.Type("\n");
+        Assert.Equal(null, history.Get("きょう"), "ひらがなに選び直したら、覚えた変換を忘れる");
+        var next = new Keyboard(history: history);
+        next.Type("kyou ");
+        Assert.Equal("今日", next.Showing, "次は変換エンジンの結果に戻る");
+    }
+
+    [Test]
+    public static void Learning_KanaWithoutChoosingKeepsLearnedConversion()
+    {
+        // 選び直さずに確定したとき、ほかの候補を選んだときは忘れない
+        var history = new ConversionHistory(null);
+        history.Remember("きょう", "京");
+        var k = new Keyboard(history: history);
+        k.Type("kyou \n");
+        Assert.Equal("京", history.Get("きょう"));
+    }
+
+    [Test]
+    public static void Learning_F6ThenCommitForgetsLearnedConversion()
+    {
+        // 変換せずに F6 でひらがなにして確定したときも忘れる (ライブ変換で 子の と出たのを直したとき)
+        var history = new ConversionHistory(null);
+        history.Remember("きょう", "京");
+        var k = new Keyboard(history: history);
+        k.Type("kyou");
+        k.Press(VirtualKeys.F6);
+        k.Type("\n");
+        Assert.Equal("きょう", k.Host.Output.Single());
+        Assert.Equal(null, history.Get("きょう"));
+    }
+
+    [Test]
+    public static void Learning_MacControlJOnClauseForgetsLearnedConversion()
+    {
+        // 文節が 2 つ以上あるときの Control + J は、選んでいる文節のみをひらがなにする。その文節で覚えた変換を忘れる
+        var history = new ConversionHistory(null);
+        history.Remember("たんいを", "単位ヲ");
+        history.Remember("とる", "撮る");
+        var k = new Keyboard(history: history) { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
+        k.Type("tanniwotoru ");
+        Assert.Equal("単位ヲ撮る", k.Showing);
+        k.Key(VirtualKeys.LControl);
+        k.Key('J');
+        k.Key('J', up: true);
+        k.Key(VirtualKeys.LControl, up: true);
+        Assert.Equal("たんいを撮る", k.Showing);
+        k.Type("\n");
+        Assert.Equal(null, history.Get("たんいを"), "ひらがなにした文節は忘れる");
+        Assert.Equal("撮る", history.Get("とる"), "ほかの文節は忘れない");
+    }
+
+    [Test]
     public static void Clauses_ShiftArrowResizes()
     {
         var k = new Keyboard();

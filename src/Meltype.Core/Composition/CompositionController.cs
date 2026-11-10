@@ -147,6 +147,9 @@ public sealed partial class CompositionController
         /// <summary>ユーザーが候補を選び直したか (確定時に学習する)。</summary>
         public bool Changed { get; set; }
 
+        /// <summary>F6 (Control + J) でひらがなにしたか。ひらがなのまま確定したら、この読みで覚えた変換を忘れる。</summary>
+        public bool KanaByKey { get; set; }
+
         /// <summary>変換エンジンが返したときの Zenzai の答え (Zenzai の答えでなければ null)。今の文字列がこれと同じなら「Zenzai」と出す。</summary>
         public string? ZenzaiText { get; init; }
 
