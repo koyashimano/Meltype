@@ -71,7 +71,11 @@ internal static partial class CompositionController
         }
         RecordCorrection(state, env, converting, text, suffix);
         if (converting) LearnClauses(state, env);
-        else if (Learning(state, env) && !state.EscReverted) env.Learning.LearnLanguage(state.Text, CompositionText.Segments(state.Text, env), CompositionText.LearningContext(state.Text, env), state.WordContinues);
+        else if (Learning(state, env) && !state.EscReverted)
+        {
+            env.Learning.LearnLanguage(state.Text, CompositionText.Segments(state.Text, env), CompositionText.LearningContext(state.Text, env), state.WordContinues);
+            ForgetConversionAsKana(state, env, text);
+        }
         if (!converting || state.Clauses.All(CompositionLearning.Learnable))
             RememberPhrase(state, env, converting ? string.Concat(state.Clauses.Select(c => c.IsEnglish ? "" : c.Reading)) : CompositionText.AllKana(state.Text, env, final: true), text, english);
         CommitText(state, env, text + suffix, english, CompositionText.Raw(state.Text), chosen, preserveText, string.Join("、", rules));
@@ -145,6 +149,16 @@ internal static partial class CompositionController
     private static void LearnClauses(CompositionState state, CompositionEnv env)
     {
         if (Learning(state, env)) env.Learning.Learn(state.Clauses, ConversionContext(state), CompositionText.LearningContext(state.Text, env));
+    }
+
+    /// <summary>
+    /// 変換せずに F6 (Control + J) でひらがなにして確定したら、その読みで覚えた変換 (この → 子の) を忘れる。
+    /// ライブ変換で覚えた変換が出たのを、ひらがなに直して確定したとき。
+    /// </summary>
+    private static void ForgetConversionAsKana(CompositionState state, CompositionEnv env, string text)
+    {
+        if (state.Text.Mode != DisplayMode.Hiragana) return;
+        env.Services.History?.Forget(text);
     }
 
     /// <summary>予測変換の候補を確定する。日本語なら覚え直して、次からより前に出す。</summary>

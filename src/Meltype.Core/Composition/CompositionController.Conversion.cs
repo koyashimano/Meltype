@@ -1016,6 +1016,7 @@ internal static partial class CompositionController
         clause.Candidates = JapaneseCandidates(state, env, clause.Reading, null, env.Converter);
         clause.Index = 0;
         clause.Changed = false;
+        clause.KanaByKey = false;
         // 前の読みのもの。候補の一覧は、文節を選んだときに新しい読みで取り直す
         clause.Expanded = false;
         clause.Raw = null;
