@@ -171,7 +171,7 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
               let index = candidateList.firstIndex(of: string) else { return }
         // クリックした候補が候補ウィンドウで選ばれているので、覚えている位置も合わせる。
         windowIndex = index
-        send("CandidateClicked", client: client, ["index": index])
+        send("CandidateClicked", client: client, ["index": candidatePageStart + index])
     }
 
     /// 候補ウィンドウの中で選択が動いた (マウスで選んだときなど)。本体の選択も合わせる (確定はしない)。
@@ -187,7 +187,7 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
               let string = candidateString?.string,
               let index = candidateList.firstIndex(of: string) else { return }
         windowIndex = index
-        send("CandidateHighlighted", client: client, ["index": index])
+        send("CandidateHighlighted", client: client, ["index": candidatePageStart + index])
     }
 
     // ---- メニュー (メニューバーの入力メニュー) ----
@@ -427,7 +427,13 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
         selectingFromCore = true
         defer { selectingFromCore = false }
         // 注記 (候補の種類など) は候補の後ろに付ける
-        let items = zip(list.items, list.notes).map { item, note in note.map { item + "　" + $0 } ?? item }
+        let all = zip(list.items, list.notes).map { item, note in note.map { item + "　" + $0 } ?? item }
+        // 本体と同じく 9 個ずつのページに分けて、選んでいる候補のページのみを出す。
+        // スクロールする一覧に全部を渡すと、候補ウィンドウの 1〜9 の番号がスクロールした位置から振られ、
+        // 本体がページの先頭から数える数字キーの候補とずれる。
+        let pageStart = max(0, list.selected) / Self.candidatePageSize * Self.candidatePageSize
+        let items = pageStart < all.count ? Array(all[pageStart..<min(all.count, pageStart + Self.candidatePageSize)]) : []
+        candidatePageStart = pageStart
         // 一覧を作り直すと選択が先頭に戻るので、中身が変わったとき (別の文節に移ったときなど) だけ作り直す。
         if candidateList != items || !window.isVisible() {
             candidateList = items
@@ -442,13 +448,19 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
         }
         setCandidatesWindowLevel(above: client)
         if list.selected >= 0 && list.selected < list.items.count {
-            selectInWindow(window, index: list.selected)
+            selectInWindow(window, index: list.selected - pageStart)
         }
         scheduleMeaning(list)
     }
 
-    /// 候補ウィンドウで今選ばれている候補の番号 (一覧を作り直すと先頭に戻る)。
+    /// 候補ウィンドウで今選ばれている候補の、ページの中での番号 (一覧を作り直すと先頭に戻る)。
     private var windowIndex = 0
+
+    /// 候補の一覧の 1 ページの数。本体の CompositionController.CandidatePageSize と合わせる。
+    private static let candidatePageSize = 9
+
+    /// 候補ウィンドウに出しているページの先頭の候補が、本体の候補の一覧の何番目か。
+    private var candidatePageStart = 0
 
     /// 候補ウィンドウ (IMKUIPanel) のもともとの表示レベル (macOS 15 で確かめた値。IMK のウィンドウはこの 1 つだけだった)。
     private static let defaultCandidatesLevel = NSWindow.Level(rawValue: 20)
