@@ -140,6 +140,8 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown || event.type == .flagsChanged && Int(event.keyCode) == kVK_CapsLock,
               let client = sender as? IMKTextInput else { return false }
+        // activateServer が呼ばれずにキーが届くことがあるので、キーを受けたらサービスの届け先を自分にする。
+        ModeServices.shared.activate(self)
         return send("KeyPressed", client: client, keyEvent: event)?.result.consumed ?? false
     }
 
