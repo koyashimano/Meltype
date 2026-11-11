@@ -617,6 +617,13 @@ public sealed partial class CompositionController
                 // Shift+Space: 前の候補へ (Microsoft IME と同じ。Mac でも Shift を押したまま Space で戻れるように: issue #140)
                 NextCandidate(-1);
                 return true;
+            case VirtualKeys.Down when shift:
+                // Shift+↓ / Shift+↑: 候補の一覧のページ送り (macOS 標準の日本語入力と同じ)
+                NextCandidatePage(+1);
+                return true;
+            case VirtualKeys.Up when shift:
+                NextCandidatePage(-1);
+                return true;
             case VirtualKeys.Convert:
             case VirtualKeys.Space:
             case VirtualKeys.Down:

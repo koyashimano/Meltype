@@ -4792,6 +4792,42 @@ internal static class CompositionTests
     }
 
     [Test]
+    public static void ShiftArrows_TurnCandidatePages()
+    {
+        // macOS 標準の日本語入力と同じく、変換中の Shift+↓ / Shift+↑ で候補の一覧のページを送る
+        var many = Enumerable.Range(1, 20).Select(i => "候補" + i).ToArray();
+        var k = new Keyboard(moreCandidates: reading => reading == "かわ" ? many : []);
+        k.Type("kawa ");
+        k.Press(VirtualKeys.Down);
+        Assert.Equal(1, k.Host.View!.SelectedIndex, "Shift なしの ↓ は次の候補");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Down);
+        Assert.Equal(9, k.Host.View!.SelectedIndex, "次のページの最初の候補");
+        k.Press(VirtualKeys.Up);
+        Assert.Equal(0, k.Host.View!.SelectedIndex, "前のページの最初の候補");
+        k.Press(VirtualKeys.Up);
+        Assert.Equal((k.Host.View!.Candidates.Count - 1) / 9 * 9, k.Host.View.SelectedIndex, "最初のページの前は最後のページ");
+        k.Key(VirtualKeys.LShift, up: true);
+        Assert.True(k.Host.View is { Converting: true }, "確定しない");
+        Assert.Equal("", k.Host.Document);
+    }
+
+    [Test]
+    public static void CandidatesOnSecondSpace_ShiftDownBeforeListGoesToNextCandidate()
+    {
+        // 一覧を出す前の Shift+↓ は、PageDown と同じく見ていないページに飛ばずに次の候補にする
+        var many = Enumerable.Range(1, 20).Select(i => $"川{i}").ToList();
+        var k = new Keyboard(moreCandidates: r => r == "かわ" ? many : []) { CandidatesOnSecondSpace = true };
+        k.Type("kawa ");
+        k.Key(VirtualKeys.LShift);
+        k.Press(VirtualKeys.Down);
+        Assert.Equal(1, k.Host.View!.SelectedIndex);
+        k.Press(VirtualKeys.Down);
+        Assert.Equal(9, k.Host.View!.SelectedIndex, "一覧を出したあとはページ送り");
+        k.Key(VirtualKeys.LShift, up: true);
+    }
+
+    [Test]
     public static void Candidates_GoConvertShowsEngineCandidates()
     {
         // #1015・#1088: go の候補が go ご だけで、語 碁 後 が出ない。go は英単語として見えるので、Space は英字で確定し、変換キーで ご を変換する
