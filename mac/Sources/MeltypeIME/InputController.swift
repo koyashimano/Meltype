@@ -118,6 +118,8 @@ final class MeltypeInputController: IMKInputController, ModeServiceTarget {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown, let client = sender as? IMKTextInput else { return false }
+        // activateServer が呼ばれずにキーが届くことがあるので、キーを受けたらサービスの届け先を自分にする。
+        ModeServices.shared.activate(self)
         let flags = event.modifierFlags
         var key: [String: Any] = ["vk": KeyMapping.virtualKey(for: event),
                                   "shift": flags.contains(.shift), "ctrl": flags.contains(.control),
