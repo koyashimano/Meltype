@@ -719,14 +719,15 @@ internal static class CompositionConversion
     }
 
     /// <summary>候補の一覧の次 (前) のページの最初の候補を選ぶ。最後のページの次は最初のページに戻る。</summary>
-    internal static void NextCandidatePage(Conversion conversion, CompositionEnv env, int step)
+    internal static void NextCandidatePage(CompositionScene.Converting scene, CompositionEnv env, int step)
     {
+        var conversion = scene.Conversion;
         var clause = conversion.SelectedClause;
         if (!clause.IsEnglish && !clause.Expanded) Expand(env, clause);
         // 一覧を出す前は、Space・↓ と同じく一覧を出して次 (前) の候補にする (見ていないページに飛ばない)
         if (!CompositionPresentation.CandidatesVisible(conversion, env))
         {
-            NextCandidate(conversion, env, step);
+            NextCandidate(scene, env, step);
             return;
         }
         var pages = (clause.Candidates.Count + CandidatePageSize - 1) / CandidatePageSize;
@@ -734,15 +735,18 @@ internal static class CompositionConversion
         var page = (Math.Max(0, clause.Index) / CandidatePageSize + step + pages) % pages;
         clause.Index = page * CandidatePageSize;
         clause.Changed = true;
+        ApplyCandidateLength(scene, env);
     }
 
-    internal static void NextCandidate(Conversion conversion, CompositionEnv env, int step)
+    internal static void NextCandidate(CompositionScene.Converting scene, CompositionEnv env, int step)
     {
+        var conversion = scene.Conversion;
         var clause = conversion.SelectedClause;
         if (!clause.Expanded) Expand(env, clause);
         conversion.CandidatesShown = true;
         clause.Index = (clause.Index + step + clause.Candidates.Count) % clause.Candidates.Count;
         clause.Changed = true;
+        ApplyCandidateLength(scene, env);
     }
 
     /// <summary>
@@ -782,8 +786,75 @@ internal static class CompositionConversion
         if (anchor < 0) return;
         var current = clause.Text;
         var merged = DistinctShown(env, clause.Reading, clause.IsEnglish, [.. clause.Candidates.Take(anchor + 1), .. more(reading, env.Deadline).Select(c => NormalizeHalfWidth(c, reading)), .. clause.Candidates.Skip(anchor + 1)]);
+        // 読みの先頭の一部のみを変換した候補を、読みの長い順に最後に追加する (下に行くほど文節が短くなる)
+        if (!clause.IsEnglish && !clause.Fixed && env.Services.ShorterCandidates is { } shorter && clause.Reading.Length >= 2)
+        {
+            clause.Span = clause.Reading;
+            clause.SpanRaw = clause.Raw;
+            clause.Lengths.Clear();
+            // DistinctShown と同じく、入力欄に出る文字が同じ候補は追加しない
+            var style = env.Settings.Punctuation;
+            var shown = merged.Select(c => NotationRules.Write(ComposedText.Converted(clause.Reading, c), style)).ToHashSet(StringComparer.Ordinal);
+            foreach (var (text, length) in shorter(clause.Reading, env.Deadline))
+            {
+                if (length <= 0 || length >= clause.Reading.Length) continue;
+                var part = clause.Reading[..length];
+                var normalized = NormalizeHalfWidth(text, part);
+                if (normalized.Length == 0 || !shown.Add(NotationRules.Write(ComposedText.Converted(part, normalized), style))) continue;
+                merged.Add(normalized);
+                clause.Lengths[normalized] = length;
+            }
+        }
         clause.Candidates = merged;
         clause.Index = Math.Max(0, merged.IndexOf(current));
+    }
+
+    /// <summary>
+    /// 選んだ候補の読みの長さに、文節を合わせる。短い読みの候補なら文節を縮め、残りの読みを次の文節にして変換する。
+    /// 全体の候補に戻ったら、残りの文節を消して元の長さに戻す。
+    /// </summary>
+    internal static void ApplyCandidateLength(CompositionScene.Converting scene, CompositionEnv env)
+    {
+        var (input, clauses, selected) = (scene.Input, scene.Conversion.Clauses, scene.Conversion.Selected);
+        var clause = clauses[selected];
+        if (clause.Span is not { } span) return;
+        var length = clause.Lengths.TryGetValue(clause.Text, out var found) ? found : span.Length;
+        if (length == clause.Reading.Length) return;
+        if (clause.Remainder is { } previous)
+        {
+            clauses.Remove(previous);
+            clause.Remainder = null;
+        }
+        clause.Reading = span[..length];
+        if (length < span.Length)
+        {
+            // 候補を順に見ているのみなので、残りの読みは Zenzai を待たずに変換する
+            var rest = new Clause(span[length..], false, []);
+            clauses.Insert(selected + 1, rest);
+            Reconvert(input, clauses, env, selected + 1, quick: true);
+            clause.Remainder = rest;
+        }
+        // 全体の長さに戻ったら、縮める前の Raw に戻す (英語の文節に Kana がなく RestoreRaw が取り直せないときのため)
+        clause.Raw = length == span.Length ? clause.SpanRaw : null;
+        RestoreRaw(input, clauses, env);
+    }
+
+    /// <summary>
+    /// 縮めた文節から別の文節に移る (区切りを動かす) とき: 縮めた長さで決める。候補は今の読みのもののみを残し、
+    /// 次にこの文節を選んだときに、今の読みで候補を取り直す。
+    /// </summary>
+    internal static void FixClauseLength(Clause clause)
+    {
+        clause.Remainder = null;
+        if (clause.Span is not { } span || clause.Reading.Length == span.Length) return;
+        var text = clause.Text;
+        clause.Candidates = clause.Candidates.Where(c => (clause.Lengths.TryGetValue(c, out var length) ? length : span.Length) == clause.Reading.Length).ToList();
+        if (!clause.Candidates.Contains(text)) clause.Candidates.Insert(0, text);
+        clause.Index = clause.Candidates.IndexOf(text);
+        clause.Span = null;
+        clause.Lengths.Clear();
+        clause.Translations.Clear();
+        clause.Expanded = false;
     }
 
     /// <summary>
@@ -801,6 +872,7 @@ internal static class CompositionConversion
         var current = clauses[selected];
         // ユーティリティ変換の Replace の文節 (空の括弧のペアなど) は、1 つの単位として選んで確定する。
         if (current.Fixed) return;
+        FixClauseLength(current);
         var next = selected + 1 < clauses.Count ? clauses[selected + 1] : null;
         // 区切りを動かせないときは、英語の文節を読み直さずにそのままにする
         if (current.IsEnglish && !CanReadAsJapanese(current)) return;
@@ -878,16 +950,21 @@ internal static class CompositionConversion
     private static bool CanReadAsJapanese(Clause clause) => clause is { IsEnglish: true, Kana: { } kana } && kana.Any(IsKana);
 
     /// <summary>index の文節を、読みだけで変換し直す。文脈は、変換ボックスの中でその文節より前にある文字まで。</summary>
-    private static void Reconvert(CompositionInput input, List<Clause> clauses, CompositionEnv env, int index)
+    /// <param name="quick">最初の候補を、Zenzai を使わないその読みのみの変換にする (待たせたくないとき)。</param>
+    private static void Reconvert(CompositionInput input, List<Clause> clauses, CompositionEnv env, int index, bool quick = false)
     {
         var clause = clauses[index];
-        clause.Candidates = JapaneseCandidates(env, clause.Reading, null, SegmentBefore(env, string.Concat(clauses.Take(index).Select(c => c.Text))), zenzai: true);
+        var before = SegmentBefore(env, string.Concat(clauses.Take(index).Select(c => c.Text)));
+        clause.Candidates = JapaneseCandidates(env, clause.Reading, quick ? Standalone(env, clause.Reading) : null, before, zenzai: true);
         clause.Index = 0;
         clause.Changed = false;
         // 前の読みのもの。候補の一覧は、文節を選んだときに新しい読みで取り直す
         clause.Expanded = false;
         clause.Raw = null;
         clause.Translations.Clear();
+        clause.Span = null;
+        clause.Lengths.Clear();
+        clause.Remainder = null;
         if (env.Learning.LearnedConversion(clause.Reading) is { } learned) Prefer(clause, learned);
         KeepTypedSymbols(input, [clause], clause.Reading);
     }

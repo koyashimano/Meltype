@@ -606,29 +606,29 @@ internal static class CompositionKeys
         {
             case VirtualKeys.Space when shift:
                 // Shift+Space: 前の候補へ (Microsoft IME と同じ。Mac でも Shift を押したまま Space で戻れるように: issue #140)
-                CompositionConversion.NextCandidate(conversion, env, -1);
+                CompositionConversion.NextCandidate(scene, env, -1);
                 return true;
             case VirtualKeys.Down when shift:
                 // Shift+↓ / Shift+↑: 候補の一覧のページ送り (macOS 標準の日本語入力と同じ)
-                CompositionConversion.NextCandidatePage(conversion, env, +1);
+                CompositionConversion.NextCandidatePage(scene, env, +1);
                 return true;
             case VirtualKeys.Up when shift:
-                CompositionConversion.NextCandidatePage(conversion, env, -1);
+                CompositionConversion.NextCandidatePage(scene, env, -1);
                 return true;
             case VirtualKeys.Convert:
             case VirtualKeys.Space:
             case VirtualKeys.Down:
-                CompositionConversion.NextCandidate(conversion, env, +1);
+                CompositionConversion.NextCandidate(scene, env, +1);
                 return true;
             case VirtualKeys.Up:
-                CompositionConversion.NextCandidate(conversion, env, -1);
+                CompositionConversion.NextCandidate(scene, env, -1);
                 return true;
             case VirtualKeys.PageDown:
                 // 候補の一覧のページ送り (Microsoft IME と同じ。アプリに通すと確定してしまっていた: issue #1016)
-                CompositionConversion.NextCandidatePage(conversion, env, +1);
+                CompositionConversion.NextCandidatePage(scene, env, +1);
                 return true;
             case VirtualKeys.PageUp:
-                CompositionConversion.NextCandidatePage(conversion, env, -1);
+                CompositionConversion.NextCandidatePage(scene, env, -1);
                 return true;
             case VirtualKeys.Right when shift:
                 CompositionConversion.Resize(scene, env, +1);
@@ -638,11 +638,12 @@ internal static class CompositionKeys
                 return true;
             case VirtualKeys.Right:
                 CompositionConversion.SplitWholeSentence(conversion);
-                conversion.Selected = Math.Min(conversion.Selected + 1, conversion.Clauses.Count - 1);
+                // 縮めた文節から移るときは、その長さで決める (移らないときは決めない)
+                if (conversion.Selected + 1 < conversion.Clauses.Count) CompositionConversion.FixClauseLength(conversion.Clauses[conversion.Selected++]);
                 return true;
             case VirtualKeys.Left:
                 CompositionConversion.SplitWholeSentence(conversion);
-                conversion.Selected = Math.Max(conversion.Selected - 1, 0);
+                if (conversion.Selected > 0) CompositionConversion.FixClauseLength(conversion.Clauses[conversion.Selected--]);
                 return true;
             case VirtualKeys.Return when shift && env.Settings.PartialCommit && conversion.Selected < conversion.Clauses.Count - 1:
                 CommitUpToSelectedClause(state, scene, env);
@@ -661,12 +662,13 @@ internal static class CompositionKeys
                 return true;
             case VirtualKeys.Tab when conversion.StartedBy == ConversionTrigger.Tab:
                 // Tab で始めた変換の中では、Tab が次の候補、Shift+Tab が前の候補 (issue #219)。
-                CompositionConversion.NextCandidate(conversion, env, shift ? -1 : +1);
+                CompositionConversion.NextCandidate(scene, env, shift ? -1 : +1);
                 return true;
             case VirtualKeys.Escape when env.Settings.EscRevertsSelectedClause && conversion.Clauses.Count > 1 &&
                                          conversion.SelectedClause is { IsEnglish: false } clause && clause.Text != clause.Reading:
                 // 設定「変換中の Esc は選んだ文節だけをかなに戻す」: 選んでいる文節だけをひらがなにして、変換は続ける (issue #670)
                 {
+                    CompositionConversion.FixClauseLength(clause);
                     var index = clause.Candidates.IndexOf(clause.Reading);
                     if (index < 0)
                     {
@@ -707,6 +709,9 @@ internal static class CompositionKeys
         if (index >= clause.Candidates.Count) return false;
         clause.Index = index;
         clause.Changed = true;
+        // 短い読みの候補なら文節を縮め、残りの読みの文節に進む
+        CompositionConversion.ApplyCandidateLength(scene, env);
+        CompositionConversion.FixClauseLength(clause);
         if (conversion.Selected + 1 < conversion.Clauses.Count) conversion.Selected++;
         else CompositionCommit.Commit(state, scene, env);
         return true;
@@ -725,7 +730,7 @@ internal static class CompositionKeys
             _ => CompositionConversion.InitialClause(env, conversion.Clauses.Count),
         };
         if (shift && vk is VirtualKeys.Left or VirtualKeys.Right) CompositionConversion.Resize(scene, env, vk == VirtualKeys.Left ? -1 : +1);
-        else if (vk == VirtualKeys.Up) CompositionConversion.NextCandidate(conversion, env, -1);
+        else if (vk == VirtualKeys.Up) CompositionConversion.NextCandidate(scene, env, -1);
     }
 
     /// <summary>
@@ -762,6 +767,7 @@ internal static class CompositionKeys
     /// </summary>
     private static void ApplyFunctionKeyToClause(Clause clause, int vk)
     {
+        CompositionConversion.FixClauseLength(clause);
         var reading = clause.IsEnglish ? clause.Kana : clause.Reading;
         var raw = clause.IsEnglish ? clause.Reading : clause.Raw;
         var text = vk switch

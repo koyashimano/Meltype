@@ -51,7 +51,9 @@ internal static class CompositionRefresh
             foreach (var (fresh, previous) in freshClauses.Zip(old))
             {
                 if (!previous.Changed) continue;
-                fresh.Candidates = CompositionConversion.Distinct([.. fresh.Candidates, .. previous.Candidates]);
+                // 短い読みの候補 (ShorterCandidates) は引き継がない。開くときの Expand が、読みの長さ付きで付け直す
+                // (引き継ぐと候補が重なり、長さを付けられない。縮めた文節は文節の数が変わるので、ここには来ない)
+                fresh.Candidates = CompositionConversion.Distinct([.. fresh.Candidates, .. previous.Candidates.Where(c => !previous.Lengths.ContainsKey(c))]);
                 fresh.Index = fresh.Candidates.IndexOf(previous.Text);
                 fresh.Changed = true;
                 fresh.Translations.UnionWith(previous.Translations);

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Meltype.Composition;
 using Meltype.Config;
 using Meltype.Dictionary;
+using Meltype.Engine;
 
 namespace Meltype.Ime;
 
@@ -64,6 +65,7 @@ public sealed class ImeHost
                 {
                     CandidatesOnSecondSpace = () => true,
                     LiveConversionWaitMs = MacLiveConversionWaitMs,
+                    ShorterCandidates = parts.Converter is HybridConverter hybrid ? hybrid.ShorterCandidates : null,
                 },
             }
             : parts;

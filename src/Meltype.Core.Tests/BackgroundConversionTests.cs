@@ -474,6 +474,20 @@ internal static class BackgroundConversionTests
     }
 
     [Test]
+    public static void ShorterCandidates_AreSingleClausePrefixesFromMozc()
+    {
+        // 読みの先頭の一部ごとに Mozc で変換し、1 つの文節になったものを読みの長い順に並べる (Mac 版の候補の一覧で、下に行くほど文節を短くする)
+        var profile = Path.Combine(Path.GetTempPath(), MozcConverterTests.FakeHelperProfile);
+        using var mozc = new MozcConverter(new MozcHelperProcess(Environment.ProcessPath!, profile));
+        var hybrid = new HybridConverter(mozc);
+        var shorter = hybrid.ShorterCandidates("たんいをとる", long.MaxValue);
+        Assert.Equal("たんいをと:5 たんいを:4 単位:3 たん:2 た:1", string.Join(" ", shorter.Select(c => $"{c.Text}:{c.Length}")));
+        // きしゃがきた は 2 つの文節に分かれる (偽のヘルパーの答え) ので、文節を縮める候補にしない
+        var split = hybrid.ShorterCandidates("きしゃがきたよ", long.MaxValue);
+        Assert.True(!split.Any(c => c.Length == 6), string.Join(" ", split));
+    }
+
+    [Test]
     public static void Mozc_AnswersFromTheCacheWhileTheHelperIsBusy()
     {
         // ヘルパーの応答を待っている間に再描画しても、届いている答えが読めないとかなに戻って、表示が 漢字 → かな と揺れる

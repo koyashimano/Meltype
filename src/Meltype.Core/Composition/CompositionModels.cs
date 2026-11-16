@@ -70,6 +70,18 @@ internal sealed class Clause(string reading, bool isEnglish, List<string> candid
 
     /// <summary>英日の区切りの案ごとの文を候補にした、文全体の文節なら、候補の文 → その案の文節。</summary>
     public Dictionary<string, List<Clause>>? Alternatives { get; init; }
+
+    /// <summary>短い読みの候補 (ShorterCandidates) を追加したときの読み。追加していなければ null。</summary>
+    public string? Span { get; set; }
+
+    /// <summary>Span のときの Raw (全体の長さに戻ったときに戻す)。</summary>
+    public string? SpanRaw { get; set; }
+
+    /// <summary>短い読みの候補と、その読みの文字数 (Span の先頭から)。ここにない候補は Span 全体の候補。</summary>
+    public Dictionary<string, int> Lengths { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>短い読みの候補を選んで縮めたときに、残りの読みで作った次の文節。縮めていなければ null。</summary>
+    public Clause? Remainder { get; set; }
 }
 
 /// <summary>

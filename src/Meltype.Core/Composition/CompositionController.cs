@@ -88,6 +88,7 @@ internal static class CompositionController
         if (index < 0 || index >= clause.Candidates.Count) return;
         clause.Index = index;
         clause.Changed = true;
+        CompositionConversion.ApplyCandidateLength(converting, env);
         CompositionPresentation.UpdateView(state, env);
     }
 
