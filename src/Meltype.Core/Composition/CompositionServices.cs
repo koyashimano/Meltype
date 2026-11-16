@@ -60,6 +60,12 @@ public sealed record CompositionServices
     public Func<bool> CandidatesOnSecondSpace { get; init; } = () => false;
 
     /// <summary>
+    /// macOS 標準の日本語入力と同じく、変換を始めたときに最後ではなく最初の文節を選ぶか。
+    /// 設定ではなく、フロント (Mac 版) が決める。
+    /// </summary>
+    public Func<bool> FirstClauseOnConversion { get; init; } = () => false;
+
+    /// <summary>
     /// ライブ変換で、変換エンジン (IBackgroundConverter) の答えを待つ上限 (ms)。1 回の入力の予算 (InputBudgetMs) を超えては待たない。
     /// 0 (既定) なら待たずにかなで出し、答えが届いたら差し替える。待つと、打つたびに かな → 漢字 と切り替わってちらつかない (Mac 版)。
     /// </summary>

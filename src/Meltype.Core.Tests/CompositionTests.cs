@@ -232,6 +232,8 @@ internal static class CompositionTests
         public bool ShowCandidatesWhileTyping { get => Settings.ShowCandidatesWhileTyping; set => Settings.ShowCandidatesWhileTyping = value; }
         /// <summary>1 回目の Space では候補の一覧を出さない (Mac 版。設定ではなくフロントが決める)。</summary>
         public bool CandidatesOnSecondSpace { get; set; }
+        /// <summary>変換を始めたときに最初の文節を選ぶ (Mac 版。設定ではなくフロントが決める)。</summary>
+        public bool FirstClauseOnConversion { get; set; }
         public string GitHubRepository { get => Settings.GitHubRepository; set => Settings.GitHubRepository = value; }
         public GitHubIssueTitles? GitHubTitles { get; set; }
         public bool ClipboardCandidates { get => Settings.ClipboardCandidates; set => Settings.ClipboardCandidates = value; }
@@ -313,6 +315,7 @@ internal static class CompositionTests
                 RomajiTypos = Typos,
                 GitHubTitles = () => GitHubTitles,
                 CandidatesOnSecondSpace = () => CandidatesOnSecondSpace,
+                FirstClauseOnConversion = () => FirstClauseOnConversion,
                 UtcNow = () => UtcNow,
                 LocalTimeZone = () => LocalTimeZone,
                 Predictor = predictor,
@@ -1271,24 +1274,23 @@ internal static class CompositionTests
     {
         // Mac: macOS 標準の日本語入力と同じく、1 回目の Space は全体を文節に区切って変換するのみで、候補の一覧は出さない。
         // 2 回目の Space で、選んでいる文節のみを次の候補にして一覧を出す。
-        var k = new Keyboard(moreCandidates: r => r == "たんいを" ? ["単位を", "単位お", "たんいを"] : []) { CandidatesOnSecondSpace = true };
-        k.Type("tanniwotoru ");
+        var k = new Keyboard(moreCandidates: r => r == "にほんごを" ? ["日本語を", "日本語お", "にほんごを"] : [])
+        { CandidatesOnSecondSpace = true, FirstClauseOnConversion = true };
+        k.Type("nihongowokaku ");
         var view = k.Host.View!;
         Assert.True(view.Converting, "変換している");
-        Assert.Equal("単位を取る", view.Text);
+        Assert.Equal("日本語を書く", view.Text);
         Assert.Equal(0, view.Candidates.Count, "1 回目は一覧を出さない: " + string.Join(",", view.Candidates));
-        Assert.Equal(1, view.SelectedClause, "変換を始めたら最後の文節を選ぶ");
-        k.Press(VirtualKeys.Left);
-        Assert.Equal(0, k.Host.View!.Candidates.Count, "← で文節を移っても一覧は出さない");
+        Assert.Equal(0, view.SelectedClause);
         k.Press(VirtualKeys.Space);
         view = k.Host.View!;
         Assert.True(view.Candidates.Count >= 2, "2 回目で一覧を出す");
         Assert.Equal(1, view.SelectedIndex, "2 回目で次の候補に進む");
         Assert.Equal(view.Candidates[1], view.Clauses![0]);
-        Assert.Equal("取る", view.Clauses![1], "最初の文節のみを変える");
+        Assert.Equal("書く", view.Clauses![1], "最初の文節のみを変える");
         k.Press(VirtualKeys.Space);
         Assert.Equal(2, k.Host.View!.SelectedIndex, "3 回目以降も最初の文節の候補を進める");
-        Assert.Equal("取る", k.Host.View!.Clauses![1]);
+        Assert.Equal("書く", k.Host.View!.Clauses![1]);
     }
 
     [Test]
@@ -1870,6 +1872,26 @@ internal static class CompositionTests
             Assert.Equal(1, k.Host.View!.SelectedClause, key);
             k.Press(VirtualKeys.Right);
             Assert.Equal(2, k.Host.View!.SelectedClause, key);
+        }
+    }
+
+    [Test]
+    public static void FirstClauseOnConversion_StartsAtTheFirstClause()
+    {
+        // Mac 版: macOS 標準の日本語入力と同じく、変換を始めたら最初の文節を選ぶ
+        foreach (var key in new[] { "space", "tab", "convert" })
+        {
+            var converter = new SplitConverter(new Dictionary<string, ConversionClause[]>
+            {
+                ["きょうはてんきがいいから"] = [new("きょうは", "今日は"), new("てんきが", "天気が"), new("いいから", "いいから")],
+            });
+            var k = new Keyboard(converter: converter, tabConversion: true) { FirstClauseOnConversion = true };
+            k.Type("kyouhatenkigaiikara");
+            k.Press(key switch { "tab" => VirtualKeys.Tab, "convert" => VirtualKeys.Convert, _ => VirtualKeys.Space });
+            Assert.Equal("今日は|天気が|いいから", string.Join("|", k.Host.View!.Clauses!), key);
+            Assert.Equal(0, k.Host.View!.SelectedClause, key);
+            k.Press(VirtualKeys.Right);
+            Assert.Equal(1, k.Host.View!.SelectedClause, key);
         }
     }
 
@@ -3145,34 +3167,33 @@ internal static class CompositionTests
     {
         // macOS 標準の日本語入力と同じく、変換中の Control + J / K / L / ; は選んでいる文節のみを変える。
         // 設定 FunctionKeysAffectSelectedClause は OFF のまま
-        var k = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
-        k.Type("tanniwotoru ");
-        Assert.Equal("単位を|取る", string.Join("|", k.Host.View!.Clauses!));
-        k.Press(VirtualKeys.Left); // 変換を始めると最後の文節を選ぶので、最初の文節に移る
+        var k = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac, FirstClauseOnConversion = true };
+        k.Type("nihongowokaku ");
+        Assert.Equal("日本語を|書く", string.Join("|", k.Host.View!.Clauses!));
         ControlKey(k, 'K');
         Assert.True(k.Host.View!.Converting, "変換は続く");
-        Assert.Equal("タンイヲ|取る", string.Join("|", k.Host.View!.Clauses!), "Control+K で選んでいる文節のみカタカナ");
+        Assert.Equal("ニホンゴヲ|書く", string.Join("|", k.Host.View!.Clauses!), "Control+K で選んでいる文節のみカタカナ");
         ControlKey(k, 'J');
-        Assert.Equal("たんいを|取る", string.Join("|", k.Host.View!.Clauses!), "Control+J でひらがな");
+        Assert.Equal("にほんごを|書く", string.Join("|", k.Host.View!.Clauses!), "Control+J でひらがな");
         ControlKey(k, 'L');
-        Assert.Equal("ｔａｎｎｉｗｏ|取る", string.Join("|", k.Host.View!.Clauses!), "Control+L で全角英字");
+        Assert.Equal("ｎｉｈｏｎｇｏｗｏ|書く", string.Join("|", k.Host.View!.Clauses!), "Control+L で全角英字");
         ControlSemicolon(k);
-        Assert.Equal("tanniwo|取る", string.Join("|", k.Host.View!.Clauses!), "Control+; で半角英数");
+        Assert.Equal("nihongowo|書く", string.Join("|", k.Host.View!.Clauses!), "Control+; で半角英数");
         ControlSemicolon(k);
-        Assert.Equal("tanniwo|取る", string.Join("|", k.Host.View!.Clauses!), "続けて押しても打ったまま");
+        Assert.Equal("nihongowo|書く", string.Join("|", k.Host.View!.Clauses!), "続けて押しても打ったまま");
 
         // Control+F で次の文節に移ってから変える
         ControlKey(k, 'F');
         ControlKey(k, 'K');
-        Assert.Equal("tanniwo|トル", string.Join("|", k.Host.View!.Clauses!), "2 番目の文節のみカタカナ");
+        Assert.Equal("nihongowo|カク", string.Join("|", k.Host.View!.Clauses!), "2 番目の文節のみカタカナ");
         k.Press(VirtualKeys.Return);
-        Assert.Equal("tanniwoトル", k.Host.Document);
+        Assert.Equal("nihongowoカク", k.Host.Document);
 
         // F7 のキーそのものは、今までどおり設定に従って全体を変える
         var f7 = new Keyboard { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
-        f7.Type("tanniwotoru ");
+        f7.Type("nihongowokaku ");
         f7.Press(VirtualKeys.F7);
-        Assert.Equal("タンイヲトル", f7.Showing, "F7 は全体をカタカナ");
+        Assert.Equal("ニホンゴヲカク", f7.Showing, "F7 は全体をカタカナ");
     }
 
     [Test]
@@ -5916,20 +5937,19 @@ internal static class CompositionTests
     {
         // 文節が 2 つ以上あるときの Control + J は、選んでいる文節のみをひらがなにする。その文節で覚えた変換を忘れる
         var history = new ConversionHistory(null);
-        history.Remember("たんいを", "単位ヲ");
-        history.Remember("とる", "撮る");
-        var k = new Keyboard(history: history) { ControlKeys = Meltype.Config.ControlKeyLayout.Mac };
-        k.Type("tanniwotoru ");
-        Assert.Equal("単位ヲ撮る", k.Showing);
-        k.Press(VirtualKeys.Left); // 変換を始めると最後の文節を選ぶので、最初の文節に移る
+        history.Remember("にほんごを", "日本語ヲ");
+        history.Remember("かく", "描く");
+        var k = new Keyboard(history: history) { ControlKeys = Meltype.Config.ControlKeyLayout.Mac, FirstClauseOnConversion = true };
+        k.Type("nihongowokaku ");
+        Assert.Equal("日本語ヲ描く", k.Showing);
         k.Key(VirtualKeys.LControl);
         k.Key('J');
         k.Key('J', up: true);
         k.Key(VirtualKeys.LControl, up: true);
-        Assert.Equal("たんいを撮る", k.Showing);
+        Assert.Equal("にほんごを描く", k.Showing);
         k.Type("\n");
-        Assert.Equal(null, history.Get("たんいを"), "ひらがなにした文節は忘れる");
-        Assert.Equal("撮る", history.Get("とる"), "ほかの文節は忘れない");
+        Assert.Equal(null, history.Get("にほんごを"), "ひらがなにした文節は忘れる");
+        Assert.Equal("描く", history.Get("かく"), "ほかの文節は忘れない");
     }
 
     [Test]

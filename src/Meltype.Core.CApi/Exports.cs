@@ -135,6 +135,7 @@ public static unsafe class Exports
                     {
                         CandidatesOnSecondSpace = () => true,
                         LiveConversionWaitMs = LiveConversionWaitMs,
+                        FirstClauseOnConversion = () => true,
                     },
                 };
             return GCHandle.ToIntPtr(GCHandle.Alloc(new ImeHost(new NativeEnvironment(), parts, () => Runtime.Settings.Current)));
