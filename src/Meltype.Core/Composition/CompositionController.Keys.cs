@@ -645,11 +645,12 @@ internal static partial class CompositionController
                 return true;
             case VirtualKeys.Right:
                 SplitWholeSentence(state);
-                state.SelectedClause = Math.Min(state.SelectedClause + 1, state.Clauses.Count - 1);
+                // 縮めた文節から移るときは、その長さで決める (移らないときは決めない)
+                if (state.SelectedClause + 1 < state.Clauses.Count) FixClauseLength(state.Clauses[state.SelectedClause++]);
                 return true;
             case VirtualKeys.Left:
                 SplitWholeSentence(state);
-                state.SelectedClause = Math.Max(state.SelectedClause - 1, 0);
+                if (state.SelectedClause > 0) FixClauseLength(state.Clauses[state.SelectedClause--]);
                 return true;
             case VirtualKeys.Return when shift && env.Settings.PartialCommit && state.SelectedClause < state.Clauses.Count - 1:
                 CommitUpToSelectedClause(state, env);
@@ -676,6 +677,7 @@ internal static partial class CompositionController
                 // 設定「変換中の Esc は選んだ文節だけをかなに戻す」: 選んでいる文節だけをひらがなにして、変換は続ける (issue #670)
                 {
                     var clause = state.Clauses[state.SelectedClause];
+                    FixClauseLength(clause);
                     var index = clause.Candidates.IndexOf(clause.Reading);
                     if (index < 0)
                     {
@@ -715,6 +717,9 @@ internal static partial class CompositionController
         if (index >= clause.Candidates.Count) return false;
         clause.Index = index;
         clause.Changed = true;
+        // 短い読みの候補なら文節を縮め、残りの読みの文節に進む
+        ApplyCandidateLength(state, env);
+        FixClauseLength(clause);
         if (state.SelectedClause + 1 < state.Clauses.Count) state.SelectedClause++;
         else Commit(state, env);
         return true;
@@ -778,6 +783,7 @@ internal static partial class CompositionController
     private static void ApplyFunctionKeyToClause(CompositionState state, int vk)
     {
         var clause = state.Clauses[state.SelectedClause];
+        FixClauseLength(clause);
         var reading = clause.IsEnglish ? clause.Kana : clause.Reading;
         var raw = clause.IsEnglish ? clause.Reading : clause.Raw;
         var text = vk switch

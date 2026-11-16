@@ -182,6 +182,26 @@ public sealed class HybridConverter(MozcConverter mozc, Func<ZenzaiConverter?>? 
     /// <summary>読みの候補の一覧 (Mozc)。</summary>
     public IReadOnlyList<string> Candidates(string reading) => mozc.Candidates(reading);
 
+    // 短い読みの候補は、読みの長さごとに上からこの数まで (1 文字の読みなどは候補がとても多く、一覧が埋まるため)
+    private const int ShorterPerLength = 3;
+    private const int MaxShorter = 30;
+
+    /// <summary>
+    /// 読みの先頭の一部のみを変換した候補 (わたしは → 私・渡し・輪) と、その読みの文字数。読みの長い順 (<see cref="CompositionServices.ShorterCandidates"/>)。
+    /// 先頭の一部ごとに Mozc で変換し、1 つの文節になった読み (語として読めるもの) の候補を並べる。2 つ以上の文節に分かれた読みは、文節を縮める候補にならないので出さない。
+    /// Zenzai は使わない (短い語の候補は辞書で決まり、待たせないため)。入力のスレッドから呼ぶ (Mozc の答えは Budget の間のみ待つ)。
+    /// </summary>
+    public IReadOnlyList<(string Text, int Length)> ShorterCandidates(string reading)
+    {
+        var list = new List<(string Text, int Length)>();
+        for (var length = reading.Length - 1; length >= 1 && list.Count < MaxShorter; length--)
+        {
+            if (char.IsHighSurrogate(reading[length - 1]) || mozc.ConvertWithCandidates(reading[..length]) is not [var only]) continue;
+            list.AddRange(only.Candidates.Take(ShorterPerLength).Select(c => (c, length)));
+        }
+        return list;
+    }
+
     /// <summary>文字列 (漢字かな混じり) の読み。かなだけならそのまま (カタカナはひらがなに)。再変換とユーザー辞書の登録で使う。分からなければ null。</summary>
     public string? Reading(string text) =>
         text.All(c => KanaChars.IsHiraganaOrLongMark(c) || KanaChars.IsKatakana(c)) ? KanaChars.ToHiragana(text) : mozc.Reading(text);
